@@ -6,6 +6,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { MeModule } from './me/me.module';
 import { ModuloModule } from './modulo/modulo.module';
 import { ConversaModule } from './conversa/conversa.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { ConversaModule } from './conversa/conversa.module';
     MeModule,
     ModuloModule,
     ConversaModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],
