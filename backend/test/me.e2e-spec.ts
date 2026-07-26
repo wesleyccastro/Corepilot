@@ -35,24 +35,60 @@ describe('GET /me (isolamento multi-tenant)', () => {
   });
 
   afterAll(async () => {
-    await prisma.auditLog.deleteMany({
-      where: { empresaId: { in: empresaIdsParaLimpar } },
-    });
-    await prisma.usuarioEmpresa.deleteMany({
-      where: { empresaId: { in: empresaIdsParaLimpar } },
-    });
-    await prisma.usuario.deleteMany({
-      where: { supabaseUserId: { in: authUserIdsParaLimpar } },
-    });
-    await prisma.empresa.deleteMany({
-      where: { id: { in: empresaIdsParaLimpar } },
-    });
+    // Cada passo de limpeza é isolado: uma falha em um passo (por exemplo,
+    // deleteTestUser agora lança erro quando a Admin API falha) não pode
+    // impedir os passos seguintes de rodar — senão dados de teste reais
+    // vazam para o projeto Supabase compartilhado. app.close() roda sempre,
+    // no finally, independente do que aconteceu na limpeza acima.
+    try {
+      try {
+        await prisma.auditLog.deleteMany({
+          where: { empresaId: { in: empresaIdsParaLimpar } },
+        });
+      } catch (err) {
+        console.warn('Falha ao limpar AuditLog de teste:', err);
+      }
 
-    for (const userId of authUserIdsParaLimpar) {
-      await deleteTestUser(userId);
+      try {
+        await prisma.usuarioEmpresa.deleteMany({
+          where: { empresaId: { in: empresaIdsParaLimpar } },
+        });
+      } catch (err) {
+        console.warn('Falha ao limpar UsuarioEmpresa de teste:', err);
+      }
+
+      try {
+        await prisma.usuario.deleteMany({
+          where: { supabaseUserId: { in: authUserIdsParaLimpar } },
+        });
+      } catch (err) {
+        console.warn('Falha ao limpar Usuario de teste:', err);
+      }
+
+      try {
+        await prisma.empresa.deleteMany({
+          where: { id: { in: empresaIdsParaLimpar } },
+        });
+      } catch (err) {
+        console.warn('Falha ao limpar Empresa de teste:', err);
+      }
+
+      // Promise.allSettled em vez de um for+await sequencial: se deleteTestUser
+      // lançar para o primeiro usuário, o segundo ainda é tentado.
+      const resultadosSupabase = await Promise.allSettled(
+        authUserIdsParaLimpar.map((userId) => deleteTestUser(userId)),
+      );
+      resultadosSupabase.forEach((resultado, index) => {
+        if (resultado.status === 'rejected') {
+          console.warn(
+            `Falha ao deletar usuário Supabase de teste ${authUserIdsParaLimpar[index]}:`,
+            resultado.reason,
+          );
+        }
+      });
+    } finally {
+      await app.close();
     }
-
-    await app.close();
   });
 
   async function criarEmpresaComUsuarioLogado(
@@ -78,7 +114,7 @@ describe('GET /me (isolamento multi-tenant)', () => {
 
     const accessToken = await signInTestUser(email, password);
 
-    return { empresa, accessToken };
+    return { empresa, email, accessToken };
   }
 
   it('retorna a empresa correta para cada usuário e nunca mistura dados entre tenants', async () => {
@@ -109,6 +145,11 @@ describe('GET /me (isolamento multi-tenant)', () => {
     expect(corpoB.empresa.id).toBe(empresaB.empresa.id);
     expect(corpoA.empresa.id).not.toBe(corpoB.empresa.id);
 
+    expect(corpoA.usuario.email).toBe(empresaA.email);
+    expect(corpoB.usuario.email).toBe(empresaB.email);
+    expect(corpoA.perfil).toBe('admin');
+    expect(corpoB.perfil).toBe('admin');
+
     const logsA = await prisma.auditLog.findMany({
       where: { empresaId: empresaA.empresa.id },
     });
@@ -118,6 +159,7 @@ describe('GET /me (isolamento multi-tenant)', () => {
     expect(logsA).toHaveLength(1);
     expect(logsB).toHaveLength(1);
     expect(logsA[0].acao).toBe('consultar_me');
+    expect(logsB[0].acao).toBe('consultar_me');
   });
 
   it('rejeita requisição sem token', async () => {
