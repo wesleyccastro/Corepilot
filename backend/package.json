@@ -24,6 +24,7 @@
     "db:seed": "dotenv -e .env.local -- prisma db seed"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.0.1",
