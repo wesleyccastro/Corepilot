@@ -148,8 +148,8 @@ Notas:
    (`https://<projeto>.supabase.co/auth/v1/.well-known/jwks.json`), sem
    segredo compartilhado.
 4. Um segundo guard/middleware resolve `Usuario` a partir do
-   `supabaseUserId` do JWT (lazy-create na primeira request autenticada, já
-   que não há fluxo de signup próprio nesta fase) e sua `Empresa`/`Perfil`,
+   `supabaseUserId` do JWT (**somente leitura** — ver nota abaixo) e sua
+   `Empresa`/`Perfil`,
    populando um `TenantContext` **request-scoped** injetado via DI do Nest.
    O modelo de dados permite um usuário pertencer a mais de uma empresa
    (`UsuarioEmpresa` é N:N), mas a Fase 1 assume exatamente uma
@@ -157,6 +157,19 @@ Notas:
    o guard deve falhar de forma explícita (erro claro) em vez de escolher uma
    arbitrariamente. Selecionar/trocar de empresa quando um usuário pertence a
    várias fica para quando esse caso realmente existir.
+
+   Nota (correção de uma versão anterior desta spec, que previa *lazy-create*
+   de `Usuario` na primeira request): o guard **não escreve nada antes de
+   autorizar**. Como o Supabase permite auto-cadastro público e a chave anon
+   está no bundle do frontend, criar a linha `Usuario` antes de checar o
+   vínculo com uma `Empresa` deixaria qualquer estranho com um JWT válido
+   inserir linhas no banco sem nunca ter sido autorizado. O guard faz um
+   `findUnique` em `supabaseUserId`; se não achar, é 403 imediato (sem linha
+   `Usuario` não pode haver `UsuarioEmpresa`, por FK). Isso não custa nada
+   nesta fase porque `Usuario` + `UsuarioEmpresa` são sempre criados juntos
+   por `provisionUsuarioParaEmpresa` (seed/admin, §7) antes do primeiro
+   acesso. Quando existir um fluxo real de convite/signup, ele cria as duas
+   linhas — não o guard.
 5. Toda query Prisma que toca dado de empresa inclui explicitamente
    `where: { empresaId: tenantContext.empresaId }` no código do service —
    escopo explícito e auditável no código-fonte, não implícito via
@@ -166,8 +179,8 @@ Notas:
 
 - `GET /me` — retorna `Usuario` + `Empresa(s)` + `Perfil` resolvidos a partir
   do JWT. É o endpoint usado no caso de validação (seção 8).
-- Lazy-create de `Usuario` embutido no guard de resolução de tenant (sem
-  endpoint dedicado).
+- Não há endpoint de criação de `Usuario`: o provisionamento é feito pelo
+  script de seed / processo admin (§7), e o guard de tenant apenas lê.
 
 ## 7. Seed / dados de teste
 
@@ -195,7 +208,8 @@ ponta, com testes automatizados verdes.
 ## 9. Estratégia de testes
 
 - Unit: `JwtAuthGuard` (JWT válido/inválido/expirado) e resolução de
-  `TenantContext` (usuário novo vs. existente, usuário sem empresa).
+  `TenantContext` (usuário sem linha `Usuario` — 403 sem escrever no banco,
+  usuário sem empresa, usuário com mais de uma empresa, caminho feliz).
 - E2E (`backend/test/*.e2e-spec.ts`): fluxo completo `GET /me` com JWTs de
   fixture de duas empresas diferentes, confirmando isolamento cross-tenant.
 

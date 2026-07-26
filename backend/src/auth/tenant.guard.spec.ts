@@ -14,15 +14,24 @@ function buildContext(request: Partial<RequestComJwt>) {
 }
 
 describe('TenantGuard', () => {
+  // Os mocks de escrita (`create`/`upsert`) existem só para provar que o guard
+  // nunca os chama: ele resolve o tenant em modo somente-leitura.
   function buildPrismaMock() {
-    return {
-      usuario: { upsert: jest.fn() },
-      usuarioEmpresa: { findMany: jest.fn() },
+    const findUnique = jest.fn();
+    const create = jest.fn();
+    const upsert = jest.fn();
+    const findMany = jest.fn();
+
+    const prisma = {
+      usuario: { findUnique, create, upsert },
+      usuarioEmpresa: { findMany },
     } as unknown as PrismaService;
+
+    return { prisma, findUnique, create, upsert, findMany };
   }
 
   it('lança erro se o JwtAuthGuard não rodou antes', async () => {
-    const prisma = buildPrismaMock();
+    const { prisma } = buildPrismaMock();
     const guard = new TenantGuard(prisma);
     const request: Partial<RequestComJwt> = {};
 
@@ -31,10 +40,30 @@ describe('TenantGuard', () => {
     );
   });
 
+  it('rejeita usuário sem linha Usuario sem escrever nada no banco', async () => {
+    const { prisma, findUnique, create, upsert, findMany } = buildPrismaMock();
+    findUnique.mockResolvedValue(null);
+    const guard = new TenantGuard(prisma);
+    const request: Partial<RequestComJwt> = {
+      jwtPayload: { sub: 'sub-desconhecido', email: 'estranho@b.com' },
+    };
+
+    await expect(guard.canActivate(buildContext(request))).rejects.toThrow(
+      ForbiddenException,
+    );
+
+    expect(findUnique).toHaveBeenCalledWith({
+      where: { supabaseUserId: 'sub-desconhecido' },
+    });
+    expect(create).not.toHaveBeenCalled();
+    expect(upsert).not.toHaveBeenCalled();
+    expect(findMany).not.toHaveBeenCalled();
+  });
+
   it('rejeita usuário sem empresa associada', async () => {
-    const prisma = buildPrismaMock();
-    (prisma.usuario.upsert as jest.Mock).mockResolvedValue({ id: 'usuario-1' });
-    (prisma.usuarioEmpresa.findMany as jest.Mock).mockResolvedValue([]);
+    const { prisma, findUnique, create, upsert, findMany } = buildPrismaMock();
+    findUnique.mockResolvedValue({ id: 'usuario-1' });
+    findMany.mockResolvedValue([]);
     const guard = new TenantGuard(prisma);
     const request: Partial<RequestComJwt> = {
       jwtPayload: { sub: 'sub-1', email: 'a@b.com' },
@@ -43,12 +72,15 @@ describe('TenantGuard', () => {
     await expect(guard.canActivate(buildContext(request))).rejects.toThrow(
       ForbiddenException,
     );
+
+    expect(create).not.toHaveBeenCalled();
+    expect(upsert).not.toHaveBeenCalled();
   });
 
   it('rejeita usuário com mais de uma empresa (não suportado nesta fase)', async () => {
-    const prisma = buildPrismaMock();
-    (prisma.usuario.upsert as jest.Mock).mockResolvedValue({ id: 'usuario-1' });
-    (prisma.usuarioEmpresa.findMany as jest.Mock).mockResolvedValue([
+    const { prisma, findUnique, findMany } = buildPrismaMock();
+    findUnique.mockResolvedValue({ id: 'usuario-1' });
+    findMany.mockResolvedValue([
       { empresaId: 'empresa-1', perfil: 'admin' },
       { empresaId: 'empresa-2', perfil: 'membro' },
     ]);
@@ -63,11 +95,9 @@ describe('TenantGuard', () => {
   });
 
   it('resolve o tenant e anexa tenantContext na request', async () => {
-    const prisma = buildPrismaMock();
-    (prisma.usuario.upsert as jest.Mock).mockResolvedValue({ id: 'usuario-1' });
-    (prisma.usuarioEmpresa.findMany as jest.Mock).mockResolvedValue([
-      { empresaId: 'empresa-1', perfil: 'admin' },
-    ]);
+    const { prisma, findUnique, create, upsert, findMany } = buildPrismaMock();
+    findUnique.mockResolvedValue({ id: 'usuario-1' });
+    findMany.mockResolvedValue([{ empresaId: 'empresa-1', perfil: 'admin' }]);
     const guard = new TenantGuard(prisma);
     const request: Partial<RequestComJwt> & { tenantContext?: unknown } = {
       jwtPayload: { sub: 'sub-1', email: 'a@b.com' },
@@ -81,5 +111,7 @@ describe('TenantGuard', () => {
       empresaId: 'empresa-1',
       perfil: 'admin',
     });
+    expect(create).not.toHaveBeenCalled();
+    expect(upsert).not.toHaveBeenCalled();
   });
 });

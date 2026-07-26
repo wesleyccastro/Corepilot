@@ -25,15 +25,22 @@ export class TenantGuard implements CanActivate {
       );
     }
 
-    const usuario = await this.prisma.usuario.upsert({
+    // Somente leitura, de propósito: o guard NUNCA escreve antes de
+    // autorizar. O Supabase permite auto-cadastro público e a chave anon vai
+    // no bundle do frontend, então um lazy-create aqui deixaria qualquer
+    // estranho com um JWT válido inserir linhas em `Usuario` sem nunca ter
+    // sido autorizado. Nesta fase não existe fluxo de convite/signup próprio:
+    // `Usuario` + `UsuarioEmpresa` são sempre criados juntos por
+    // `provisionUsuarioParaEmpresa` (seed/admin) antes da primeira request.
+    const usuario = await this.prisma.usuario.findUnique({
       where: { supabaseUserId: payload.sub },
-      update: {},
-      create: {
-        supabaseUserId: payload.sub,
-        nome: payload.email ? payload.email.split('@')[0] : payload.sub,
-        email: payload.email ?? `${payload.sub}@sem-email.local`,
-      },
     });
+
+    // Sem linha `Usuario` não há como existir `UsuarioEmpresa` (FK) — logo o
+    // resultado é o mesmo 403, sem tocar no banco para escrita.
+    if (!usuario) {
+      throw new ForbiddenException('Usuário sem empresa associada');
+    }
 
     const vinculos = await this.prisma.usuarioEmpresa.findMany({
       where: { usuarioId: usuario.id },
