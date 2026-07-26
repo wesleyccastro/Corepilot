@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 
-describe('Prisma smoke test', () => {
+const describeIfDatabaseConfigured = process.env.DATABASE_URL ? describe : describe.skip;
+
+describeIfDatabaseConfigured('Prisma smoke test', () => {
   const prisma = new PrismaClient();
 
   afterAll(async () => {
