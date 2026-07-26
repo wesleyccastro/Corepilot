@@ -55,6 +55,7 @@ export class MensagemController {
     await this.mensagemService.appendUserMessage(conversaId, body.conteudo);
     const historico = await this.mensagemService.listByConversa(conversaId);
 
+    res.status(200);
     res.setHeader('Content-Type', 'application/x-ndjson');
     res.setHeader('Transfer-Encoding', 'chunked');
 
