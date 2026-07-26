@@ -18,8 +18,12 @@ export class MeController {
   async getMe() {
     const { usuarioId, empresaId, perfil } = this.tenantContext.get();
 
-    const usuario = await this.prisma.usuario.findUniqueOrThrow({ where: { id: usuarioId } });
-    const empresa = await this.prisma.empresa.findUniqueOrThrow({ where: { id: empresaId } });
+    const usuario = await this.prisma.usuario.findUniqueOrThrow({
+      where: { id: usuarioId },
+    });
+    const empresa = await this.prisma.empresa.findUniqueOrThrow({
+      where: { id: empresaId },
+    });
 
     await this.audit.record({
       empresaId,

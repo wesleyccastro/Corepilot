@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 
-const describeIfDatabaseConfigured = process.env.DATABASE_URL ? describe : describe.skip;
+const describeIfDatabaseConfigured = process.env.DATABASE_URL
+  ? describe
+  : describe.skip;
 
 describeIfDatabaseConfigured('Prisma smoke test', () => {
   const prisma = new PrismaClient();
@@ -10,9 +12,13 @@ describeIfDatabaseConfigured('Prisma smoke test', () => {
   });
 
   it('conecta no Postgres e persiste uma Empresa', async () => {
-    const empresa = await prisma.empresa.create({ data: { nome: 'Smoke Test Empresa' } });
+    const empresa = await prisma.empresa.create({
+      data: { nome: 'Smoke Test Empresa' },
+    });
 
-    const encontrada = await prisma.empresa.findUnique({ where: { id: empresa.id } });
+    const encontrada = await prisma.empresa.findUnique({
+      where: { id: empresa.id },
+    });
     expect(encontrada?.nome).toBe('Smoke Test Empresa');
 
     await prisma.empresa.delete({ where: { id: empresa.id } });

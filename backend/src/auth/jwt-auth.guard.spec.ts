@@ -13,35 +13,49 @@ function buildContext(headers: Record<string, string>) {
 
 describe('JwtAuthGuard', () => {
   it('rejeita quando não há cabeçalho Authorization', async () => {
-    const verifier = { verifyToken: jest.fn() } as unknown as SupabaseJwtVerifier;
+    const verifier = {
+      verifyToken: jest.fn(),
+    } as unknown as SupabaseJwtVerifier;
     const guard = new JwtAuthGuard(verifier);
     const { context } = buildContext({});
 
-    await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      UnauthorizedException,
+    );
   });
 
   it('rejeita quando o token é inválido', async () => {
     const verifier = {
-      verifyToken: jest.fn().mockRejectedValue(new Error('assinatura inválida')),
+      verifyToken: jest
+        .fn()
+        .mockRejectedValue(new Error('assinatura inválida')),
     } as unknown as SupabaseJwtVerifier;
     const guard = new JwtAuthGuard(verifier);
-    const { context } = buildContext({ authorization: 'Bearer token-invalido' });
+    const { context } = buildContext({
+      authorization: 'Bearer token-invalido',
+    });
 
-    await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      UnauthorizedException,
+    );
   });
 
   it('aceita um token válido e anexa o payload na request', async () => {
     const payload = { sub: 'user-123', email: 'user@example.com' };
-    const verifier = {
-      verifyToken: jest.fn().mockResolvedValue(payload),
-    } as unknown as SupabaseJwtVerifier;
+    // O mock fica numa const própria (em vez de ser lido de volta como
+    // `verifier.verifyToken` na asserção) para não disparar
+    // @typescript-eslint/unbound-method.
+    const verifyToken = jest.fn().mockResolvedValue(payload);
+    const verifier = { verifyToken } as unknown as SupabaseJwtVerifier;
     const guard = new JwtAuthGuard(verifier);
-    const { context, request } = buildContext({ authorization: 'Bearer token-valido' });
+    const { context, request } = buildContext({
+      authorization: 'Bearer token-valido',
+    });
 
     const resultado = await guard.canActivate(context);
 
     expect(resultado).toBe(true);
     expect(request.jwtPayload).toEqual(payload);
-    expect(verifier.verifyToken).toHaveBeenCalledWith('token-valido');
+    expect(verifyToken).toHaveBeenCalledWith('token-valido');
   });
 });
