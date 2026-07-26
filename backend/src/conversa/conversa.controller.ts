@@ -1,10 +1,10 @@
-import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TenantGuard } from '../auth/tenant.guard';
 import { TenantContext } from '../auth/tenant-context';
 import { ConversaService } from './conversa.service';
 
-@Controller('conversas')
+@Controller('modulos/:moduloId/conversas')
 @UseGuards(JwtAuthGuard, TenantGuard)
 export class ConversaController {
   constructor(
@@ -13,13 +13,13 @@ export class ConversaController {
   ) {}
 
   @Post()
-  async criar(@Query('moduloId') moduloId: string) {
+  async criar(@Param('moduloId') moduloId: string) {
     const { usuarioId, empresaId } = this.tenantContext.get();
     return this.conversaService.create(moduloId, usuarioId, empresaId);
   }
 
   @Get()
-  async listar(@Query('moduloId') moduloId: string) {
+  async listar(@Param('moduloId') moduloId: string) {
     const { usuarioId } = this.tenantContext.get();
     return this.conversaService.findAllByModuloAndUsuario(moduloId, usuarioId);
   }
