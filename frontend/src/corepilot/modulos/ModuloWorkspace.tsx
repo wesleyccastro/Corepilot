@@ -3,6 +3,8 @@ import { ChatView } from './ChatView';
 import { AgentesList } from '../agentes/AgentesList';
 import { SkillsList } from '../agentes/SkillsList';
 import { SkillExecutor } from '../agentes/SkillExecutor';
+import { FontesDeDadosList } from '../fontes-de-dados/FontesDeDadosList';
+import { ConsultasList } from '../consultas/ConsultasList';
 import type { Modulo } from './types';
 import type { Agente, Skill } from '../agentes/types';
 
@@ -12,7 +14,7 @@ interface ModuloWorkspaceProps {
   onVoltar: () => void;
 }
 
-type Aba = 'chat' | 'agentes';
+type Aba = 'chat' | 'agentes' | 'dados';
 
 export function ModuloWorkspace({ accessToken, modulo, onVoltar }: ModuloWorkspaceProps) {
   const [aba, setAba] = useState<Aba>('chat');
@@ -31,6 +33,9 @@ export function ModuloWorkspace({ accessToken, modulo, onVoltar }: ModuloWorkspa
         </button>
         <button onClick={() => setAba('agentes')} style={{ fontWeight: aba === 'agentes' ? 700 : 400 }}>
           Agentes
+        </button>
+        <button onClick={() => setAba('dados')} style={{ fontWeight: aba === 'dados' ? 700 : 400 }}>
+          Dados
         </button>
       </div>
 
@@ -56,9 +61,17 @@ export function ModuloWorkspace({ accessToken, modulo, onVoltar }: ModuloWorkspa
       {aba === 'agentes' && agenteSelecionado && skillSelecionada && (
         <SkillExecutor
           accessToken={accessToken}
+          moduloId={modulo.id}
           skill={skillSelecionada}
           onVoltar={() => setSkillSelecionada(null)}
         />
+      )}
+
+      {aba === 'dados' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <FontesDeDadosList accessToken={accessToken} />
+          <ConsultasList accessToken={accessToken} moduloId={modulo.id} />
+        </div>
       )}
     </div>
   );

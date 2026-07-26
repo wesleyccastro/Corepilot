@@ -80,3 +80,25 @@ export async function listarExecucoes(accessToken: string, skillId: string): Pro
   if (!response.ok) throw new Error(`Falha ao listar execuções (status ${response.status})`);
   return (await response.json()) as SkillExecucao[];
 }
+
+export async function anexarFerramenta(
+  accessToken: string,
+  skillId: string,
+  consultaId: string,
+): Promise<void> {
+  const response = await apiFetch(`/skills/${skillId}/ferramentas/${consultaId}`, accessToken, {
+    method: 'POST',
+  });
+  if (!response.ok) throw new Error(`Falha ao anexar ferramenta (status ${response.status})`);
+}
+
+export async function removerFerramenta(
+  accessToken: string,
+  skillId: string,
+  consultaId: string,
+): Promise<void> {
+  const response = await apiFetch(`/skills/${skillId}/ferramentas/${consultaId}`, accessToken, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error(`Falha ao remover ferramenta (status ${response.status})`);
+}
