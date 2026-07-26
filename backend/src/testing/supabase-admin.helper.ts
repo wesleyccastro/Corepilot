@@ -50,7 +50,13 @@ export async function createTestUser(
 
 export async function deleteTestUser(userId: string): Promise<void> {
   const admin = createSupabaseAdminClient();
-  await admin.auth.admin.deleteUser(userId);
+  const { error } = await admin.auth.admin.deleteUser(userId);
+
+  if (error) {
+    throw new Error(
+      `Falha ao deletar usuário de teste ${userId}: ${error.message}`,
+    );
+  }
 }
 
 export async function signInTestUser(
