@@ -11,6 +11,7 @@ import { AgenteModule } from './agente/agente.module';
 import { SkillModule } from './skill/skill.module';
 import { SkillExecucaoModule } from './skill/skill-execucao.module';
 import { FonteDeDadosModule } from './fonte-de-dados/fonte-de-dados.module';
+import { ConsultaModule } from './consulta/consulta.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { FonteDeDadosModule } from './fonte-de-dados/fonte-de-dados.module';
     SkillModule,
     SkillExecucaoModule,
     FonteDeDadosModule,
+    ConsultaModule,
   ],
   controllers: [AppController],
   providers: [AppService],
