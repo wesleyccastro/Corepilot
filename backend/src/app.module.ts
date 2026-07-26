@@ -7,6 +7,7 @@ import { MeModule } from './me/me.module';
 import { ModuloModule } from './modulo/modulo.module';
 import { ConversaModule } from './conversa/conversa.module';
 import { ChatModule } from './chat/chat.module';
+import { AgenteModule } from './agente/agente.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ChatModule } from './chat/chat.module';
     ModuloModule,
     ConversaModule,
     ChatModule,
+    AgenteModule,
   ],
   controllers: [AppController],
   providers: [AppService],
