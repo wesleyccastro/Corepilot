@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Empresa {
+  id       String   @id @default(uuid())
+  nome     String
+  criadoEm DateTime @default(now())
+
+  usuarios  UsuarioEmpresa[]
+  auditLogs AuditLog[]
+}
+
+model Usuario {
+  id             String   @id @default(uuid())
+  supabaseUserId String   @unique
+  nome           String
+  email          String   @unique
+  criadoEm       DateTime @default(now())
+
+  empresas  UsuarioEmpresa[]
+  auditLogs AuditLog[]
+}
+
+enum Perfil {
+  admin
+  membro
+}
+
+model UsuarioEmpresa {
+  usuarioId String
+  empresaId String
+  perfil    Perfil
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+  empresa Empresa @relation(fields: [empresaId], references: [id])
+
+  @@id([usuarioId, empresaId])
+}
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  empresaId     String
+  atorUsuarioId String
+  acao          String
+  dadosAntes    Json?
+  dadosDepois   Json?
+  timestamp     DateTime @default(now())
+
+  empresa Empresa @relation(fields: [empresaId], references: [id])
+  ator    Usuario @relation(fields: [atorUsuarioId], references: [id])
+}
