@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AgenteService } from '../agente/agente.service';
 import type { CreateSkillDto } from './dto/create-skill.dto';
@@ -18,7 +19,7 @@ export class SkillService {
         agenteId,
         nome: dto.nome,
         objetivo: dto.objetivo,
-        camposSaida: dto.camposSaida,
+        camposSaida: dto.camposSaida as unknown as Prisma.InputJsonValue,
       },
     });
   }

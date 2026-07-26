@@ -11,5 +11,6 @@ import { ConversaModule } from '../conversa/conversa.module';
   imports: [AuthModule, AuditModule, ConversaModule],
   controllers: [MensagemController],
   providers: [MensagemService, AnthropicService, anthropicClientProvider],
+  exports: [AnthropicService],
 })
 export class ChatModule {}
