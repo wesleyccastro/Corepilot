@@ -12,11 +12,12 @@ model Empresa {
   nome     String
   criadoEm DateTime @default(now())
 
-  usuarios  UsuarioEmpresa[]
-  auditLogs AuditLog[]
-  modulos   Modulo[]
-  conversas Conversa[]
-  agentes   Agente[]
+  usuarios      UsuarioEmpresa[]
+  auditLogs     AuditLog[]
+  modulos       Modulo[]
+  conversas     Conversa[]
+  agentes       Agente[]
+  fontesDeDados FonteDeDados[]
 }
 
 model Usuario {
@@ -70,9 +71,10 @@ model Modulo {
   modeloIA   String   @default("claude-sonnet-5")
   criadoEm   DateTime @default(now())
 
-  empresa   Empresa    @relation(fields: [empresaId], references: [id])
+  empresa   Empresa                 @relation(fields: [empresaId], references: [id])
   conversas Conversa[]
   agentes   Agente[]
+  consultas ConsultaParametrizada[]
 }
 
 model Conversa {
@@ -130,8 +132,9 @@ model Skill {
   camposSaida Json
   criadoEm    DateTime @default(now())
 
-  agente    Agente          @relation(fields: [agenteId], references: [id])
-  execucoes SkillExecucao[]
+  agente      Agente                  @relation(fields: [agenteId], references: [id])
+  execucoes   SkillExecucao[]
+  ferramentas ConsultaParametrizada[]
 }
 
 model SkillExecucao {
@@ -146,4 +149,50 @@ model SkillExecucao {
 
   skill   Skill   @relation(fields: [skillId], references: [id])
   usuario Usuario @relation(fields: [usuarioId], references: [id])
+}
+
+model FonteDeDados {
+  id                 String    @id @default(uuid())
+  empresaId          String
+  tipo               String
+  nome               String
+  configuracao       Json
+  ultimoTesteEm      DateTime?
+  ultimoTesteSucesso Boolean?
+  ultimaMensagemErro String?
+  criadoEm           DateTime  @default(now())
+
+  empresa   Empresa                 @relation(fields: [empresaId], references: [id])
+  consultas ConsultaParametrizada[]
+}
+
+model ConsultaParametrizada {
+  id                            String    @id @default(uuid())
+  moduloId                      String
+  fonteDeDadosId                String
+  nome                          String
+  codSentenca                   String
+  parametrosSincronizacao       Json
+  camposFiltro                  Json
+  colunas                       Json?
+  testada                       Boolean   @default(false)
+  sincronizacaoAtiva            Boolean   @default(false)
+  intervaloSincronizacaoMinutos Int?
+  ultimaSincronizacaoEm         DateTime?
+  ultimoResultadoSincronizacao  Json?
+  criadoEm                      DateTime  @default(now())
+
+  modulo       Modulo              @relation(fields: [moduloId], references: [id])
+  fonteDeDados FonteDeDados        @relation(fields: [fonteDeDadosId], references: [id])
+  resultados   ConsultaResultado[]
+  skills       Skill[]
+}
+
+model ConsultaResultado {
+  id                      String   @id @default(uuid())
+  consultaParametrizadaId String
+  dados                   Json
+  sincronizadoEm          DateTime @default(now())
+
+  consulta ConsultaParametrizada @relation(fields: [consultaParametrizadaId], references: [id])
 }
