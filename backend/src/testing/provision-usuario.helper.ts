@@ -23,9 +23,18 @@ export async function provisionUsuarioParaEmpresa(
   });
 
   await prisma.usuarioEmpresa.upsert({
-    where: { usuarioId_empresaId: { usuarioId: usuario.id, empresaId: params.empresaId } },
+    where: {
+      usuarioId_empresaId: {
+        usuarioId: usuario.id,
+        empresaId: params.empresaId,
+      },
+    },
     update: { perfil: params.perfil },
-    create: { usuarioId: usuario.id, empresaId: params.empresaId, perfil: params.perfil },
+    create: {
+      usuarioId: usuario.id,
+      empresaId: params.empresaId,
+      perfil: params.perfil,
+    },
   });
 
   return usuario;

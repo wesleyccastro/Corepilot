@@ -9,18 +9,29 @@ function requireEnv(name: string): string {
 }
 
 function createSupabaseAdminClient() {
-  return createClient(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_SERVICE_ROLE_KEY'), {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  return createClient(
+    requireEnv('SUPABASE_URL'),
+    requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+    },
+  );
 }
 
 function createSupabaseAnonClient() {
-  return createClient(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_PUBLISHABLE_KEY'), {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  return createClient(
+    requireEnv('SUPABASE_URL'),
+    requireEnv('SUPABASE_PUBLISHABLE_KEY'),
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+    },
+  );
 }
 
-export async function createTestUser(email: string, password: string): Promise<User> {
+export async function createTestUser(
+  email: string,
+  password: string,
+): Promise<User> {
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin.auth.admin.createUser({
     email,
@@ -29,7 +40,9 @@ export async function createTestUser(email: string, password: string): Promise<U
   });
 
   if (error || !data.user) {
-    throw new Error(`Falha ao criar usuário de teste ${email}: ${error?.message}`);
+    throw new Error(
+      `Falha ao criar usuário de teste ${email}: ${error?.message}`,
+    );
   }
 
   return data.user;
@@ -40,12 +53,20 @@ export async function deleteTestUser(userId: string): Promise<void> {
   await admin.auth.admin.deleteUser(userId);
 }
 
-export async function signInTestUser(email: string, password: string): Promise<string> {
+export async function signInTestUser(
+  email: string,
+  password: string,
+): Promise<string> {
   const anon = createSupabaseAnonClient();
-  const { data, error } = await anon.auth.signInWithPassword({ email, password });
+  const { data, error } = await anon.auth.signInWithPassword({
+    email,
+    password,
+  });
 
   if (error || !data.session) {
-    throw new Error(`Falha ao logar usuário de teste ${email}: ${error?.message}`);
+    throw new Error(
+      `Falha ao logar usuário de teste ${email}: ${error?.message}`,
+    );
   }
 
   return data.session.access_token;
