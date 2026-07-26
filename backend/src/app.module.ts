@@ -14,6 +14,7 @@ import { FonteDeDadosModule } from './fonte-de-dados/fonte-de-dados.module';
 import { ConsultaModule } from './consulta/consulta.module';
 import { ConsultaTesteModule } from './consulta/consulta-teste.module';
 import { SyncCronModule } from './consulta/sync-cron.module';
+import { FerramentaModule } from './skill/ferramenta.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { SyncCronModule } from './consulta/sync-cron.module';
     ConsultaModule,
     ConsultaTesteModule,
     SyncCronModule,
+    FerramentaModule,
   ],
   controllers: [AppController],
   providers: [AppService],
