@@ -12,6 +12,7 @@ import { SkillModule } from './skill/skill.module';
 import { SkillExecucaoModule } from './skill/skill-execucao.module';
 import { FonteDeDadosModule } from './fonte-de-dados/fonte-de-dados.module';
 import { ConsultaModule } from './consulta/consulta.module';
+import { ConsultaTesteModule } from './consulta/consulta-teste.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ConsultaModule } from './consulta/consulta.module';
     SkillExecucaoModule,
     FonteDeDadosModule,
     ConsultaModule,
+    ConsultaTesteModule,
   ],
   controllers: [AppController],
   providers: [AppService],
