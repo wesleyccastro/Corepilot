@@ -8,6 +8,7 @@ import { ModuloModule } from './modulo/modulo.module';
 import { ConversaModule } from './conversa/conversa.module';
 import { ChatModule } from './chat/chat.module';
 import { AgenteModule } from './agente/agente.module';
+import { SkillModule } from './skill/skill.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { AgenteModule } from './agente/agente.module';
     ConversaModule,
     ChatModule,
     AgenteModule,
+    SkillModule,
   ],
   controllers: [AppController],
   providers: [AppService],
