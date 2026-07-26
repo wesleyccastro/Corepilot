@@ -10,6 +10,7 @@ import { ChatModule } from './chat/chat.module';
 import { AgenteModule } from './agente/agente.module';
 import { SkillModule } from './skill/skill.module';
 import { SkillExecucaoModule } from './skill/skill-execucao.module';
+import { FonteDeDadosModule } from './fonte-de-dados/fonte-de-dados.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { SkillExecucaoModule } from './skill/skill-execucao.module';
     AgenteModule,
     SkillModule,
     SkillExecucaoModule,
+    FonteDeDadosModule,
   ],
   controllers: [AppController],
   providers: [AppService],
