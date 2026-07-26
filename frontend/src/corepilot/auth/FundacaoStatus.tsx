@@ -3,6 +3,9 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase/client';
 import { apiFetch } from '../api/apiFetch';
 import { CorePilotApp } from '../CorePilotApp';
+import { ModulosList } from '../modulos/ModulosList';
+import { ChatView } from '../modulos/ChatView';
+import type { Modulo } from '../modulos/types';
 
 interface MeResponse {
   usuario: { id: string; nome: string; email: string };
@@ -14,6 +17,7 @@ export function FundacaoStatus({ session }: { session: Session }) {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showPrototype, setShowPrototype] = useState(false);
+  const [moduloSelecionado, setModuloSelecionado] = useState<Modulo | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -39,6 +43,16 @@ export function FundacaoStatus({ session }: { session: Session }) {
     return <CorePilotApp />;
   }
 
+  if (moduloSelecionado) {
+    return (
+      <ChatView
+        accessToken={session.access_token}
+        modulo={moduloSelecionado}
+        onVoltar={() => setModuloSelecionado(null)}
+      />
+    );
+  }
+
   return (
     <div style={{ maxWidth: 480, margin: '80px auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
       <h1>CorePilot — Fundação</h1>
@@ -61,6 +75,7 @@ export function FundacaoStatus({ session }: { session: Session }) {
         <button onClick={() => setShowPrototype(true)}>Ver protótipo (mock)</button>
         <button onClick={() => supabase.auth.signOut()}>Sair</button>
       </div>
+      <ModulosList accessToken={session.access_token} onAbrirModulo={setModuloSelecionado} />
     </div>
   );
 }

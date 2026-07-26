@@ -14,6 +14,8 @@ model Empresa {
 
   usuarios  UsuarioEmpresa[]
   auditLogs AuditLog[]
+  modulos   Modulo[]
+  conversas Conversa[]
 }
 
 model Usuario {
@@ -25,6 +27,7 @@ model Usuario {
 
   empresas  UsuarioEmpresa[]
   auditLogs AuditLog[]
+  conversas Conversa[]
 }
 
 enum Perfil {
@@ -54,4 +57,49 @@ model AuditLog {
 
   empresa Empresa @relation(fields: [empresaId], references: [id])
   ator    Usuario @relation(fields: [atorUsuarioId], references: [id])
+}
+
+model Modulo {
+  id         String   @id @default(uuid())
+  empresaId  String
+  nome       String
+  objetivo   String
+  instrucoes String?
+  modeloIA   String   @default("claude-sonnet-5")
+  criadoEm   DateTime @default(now())
+
+  empresa   Empresa    @relation(fields: [empresaId], references: [id])
+  conversas Conversa[]
+}
+
+model Conversa {
+  id           String   @id @default(uuid())
+  empresaId    String
+  moduloId     String
+  usuarioId    String
+  titulo       String?
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  empresa   Empresa    @relation(fields: [empresaId], references: [id])
+  modulo    Modulo     @relation(fields: [moduloId], references: [id])
+  usuario   Usuario    @relation(fields: [usuarioId], references: [id])
+  mensagens Mensagem[]
+}
+
+enum PapelMensagem {
+  usuario
+  agente
+}
+
+model Mensagem {
+  id            String        @id @default(uuid())
+  conversaId    String
+  papel         PapelMensagem
+  conteudo      String
+  tokensEntrada Int?
+  tokensSaida   Int?
+  criadoEm      DateTime      @default(now())
+
+  conversa Conversa @relation(fields: [conversaId], references: [id])
 }
