@@ -9,6 +9,7 @@ import { ConversaModule } from './conversa/conversa.module';
 import { ChatModule } from './chat/chat.module';
 import { AgenteModule } from './agente/agente.module';
 import { SkillModule } from './skill/skill.module';
+import { SkillExecucaoModule } from './skill/skill-execucao.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { SkillModule } from './skill/skill.module';
     ChatModule,
     AgenteModule,
     SkillModule,
+    SkillExecucaoModule,
   ],
   controllers: [AppController],
   providers: [AppService],
