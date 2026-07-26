@@ -4,6 +4,7 @@ import type { SkillService } from './skill.service';
 import type { SkillExecucaoService } from './skill-execucao.service';
 import type { AnthropicService } from '../chat/anthropic.service';
 import type { AuditService } from '../audit/audit.service';
+import type { PrismaService } from '../prisma/prisma.service';
 import type { TenantContext } from '../auth/tenant-context';
 
 describe('SkillExecucaoController', () => {
@@ -18,6 +19,7 @@ describe('SkillExecucaoController', () => {
     agenteId: 'agente-1',
     objetivo: 'Triar solicitações',
     camposSaida: [{ nome: 'titulo', tipo: 'string', obrigatorio: true }],
+    ferramentas: [] as { id: string; nome: string; camposFiltro: unknown }[],
     agente: {
       id: 'agente-1',
       moduloId: 'modulo-1',
@@ -27,6 +29,23 @@ describe('SkillExecucaoController', () => {
       modeloIA: 'claude-sonnet-5',
     },
   };
+
+  const skillComFerramenta = {
+    ...skillComAgente,
+    ferramentas: [
+      {
+        id: 'consulta-1',
+        nome: 'Saldo de estoque',
+        camposFiltro: [{ nome: 'codProduto', tipo: 'string', obrigatorio: true }],
+      },
+    ],
+  };
+
+  function buildPrismaVazio(): PrismaService {
+    return {
+      consultaResultado: { findMany: jest.fn() },
+    } as unknown as PrismaService;
+  }
 
   function buildDeps() {
     const skillService = {
@@ -46,6 +65,8 @@ describe('SkillExecucaoController', () => {
         parsed_output: { titulo: 'ok' },
         usage: { input_tokens: 10, output_tokens: 5 },
       }),
+      createWithTools: jest.fn(),
+      parseStructuredFromHistory: jest.fn(),
     } as unknown as AnthropicService;
     const audit = { record: jest.fn() } as unknown as AuditService;
     return { skillService, skillExecucaoService, anthropicService, audit };
@@ -58,6 +79,7 @@ describe('SkillExecucaoController', () => {
       skillExecucaoService,
       anthropicService,
       audit,
+      buildPrismaVazio(),
       buildTenantContext(),
     );
 
@@ -97,6 +119,7 @@ describe('SkillExecucaoController', () => {
       skillExecucaoService,
       anthropicService,
       audit,
+      buildPrismaVazio(),
       buildTenantContext(),
     );
 
@@ -115,6 +138,7 @@ describe('SkillExecucaoController', () => {
       skillExecucaoService,
       anthropicService,
       audit,
+      buildPrismaVazio(),
       buildTenantContext(),
     );
 
@@ -123,5 +147,51 @@ describe('SkillExecucaoController', () => {
     expect(skillService.findByIdInEmpresa).toHaveBeenCalledWith('skill-1', 'empresa-1');
     expect(skillExecucaoService.listBySkill).toHaveBeenCalledWith('skill-1');
     expect(resultado).toEqual([{ id: 'execucao-1' }]);
+  });
+
+  it('roda o loop de tool-use e usa dados locais (nunca chama o RM) quando a skill tem ferramentas', async () => {
+    const { skillService, skillExecucaoService, anthropicService, audit } = buildDeps();
+    (skillService.findByIdInEmpresa as jest.Mock).mockResolvedValue(skillComFerramenta);
+    (anthropicService.createWithTools as jest.Mock)
+      .mockResolvedValueOnce({
+        stop_reason: 'tool_use',
+        content: [
+          { type: 'tool_use', id: 'call-1', name: 'consulta_consulta-1', input: { codProduto: 'X1' } },
+        ],
+      })
+      .mockResolvedValueOnce({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok' }] });
+    (anthropicService.parseStructuredFromHistory as jest.Mock).mockResolvedValue({
+      parsed_output: { titulo: 'ok' },
+      usage: { input_tokens: 30, output_tokens: 10 },
+    });
+    const prisma = {
+      consultaResultado: {
+        findMany: jest.fn().mockResolvedValue([{ dados: { codProduto: 'X1', saldo: 42 } }]),
+      },
+    } as unknown as PrismaService;
+    const controller = new SkillExecucaoController(
+      skillService,
+      skillExecucaoService,
+      anthropicService,
+      audit,
+      prisma,
+      buildTenantContext(),
+    );
+
+    const resultado = await controller.executar('skill-1', { entrada: 'Qual o saldo do produto X1?' });
+
+    expect(anthropicService.createWithTools).toHaveBeenCalledTimes(2);
+    expect(prisma.consultaResultado.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ consultaParametrizadaId: 'consulta-1' }),
+      }),
+    );
+    expect(anthropicService.parseStructuredFromHistory).toHaveBeenCalled();
+    expect(resultado).toEqual({
+      execucaoId: 'execucao-1',
+      saida: { titulo: 'ok' },
+      tokensEntrada: 10,
+      tokensSaida: 5,
+    });
   });
 });

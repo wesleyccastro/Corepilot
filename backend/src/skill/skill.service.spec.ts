@@ -80,7 +80,7 @@ describe('SkillService', () => {
     );
     expect(prisma.skill.findFirst).toHaveBeenCalledWith({
       where: { id: 'skill-x', agente: { empresaId: 'empresa-1' } },
-      include: { agente: true },
+      include: { agente: true, ferramentas: true },
     });
   });
 

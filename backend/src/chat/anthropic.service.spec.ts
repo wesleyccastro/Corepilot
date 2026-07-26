@@ -52,4 +52,59 @@ describe('AnthropicService', () => {
     );
     expect(resultado).toBe(respostaFalsa);
   });
+
+  it('createWithTools chama client.messages.create com tools', async () => {
+    const respostaFalsa = { stop_reason: 'end_turn', content: [] };
+    const client = {
+      messages: { create: jest.fn().mockResolvedValue(respostaFalsa) },
+    } as unknown as Anthropic;
+    const service = new AnthropicService(client);
+    const tools = [
+      { name: 'consulta_1', description: 'x', input_schema: { type: 'object' as const, properties: {}, required: [] } },
+    ];
+
+    const resultado = await service.createWithTools({
+      system: 'sys',
+      messages: [{ role: 'user', content: 'oi' }],
+      model: 'claude-sonnet-5',
+      maxTokens: 4096,
+      tools,
+    });
+
+    expect(client.messages.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'claude-sonnet-5',
+        max_tokens: 4096,
+        system: 'sys',
+        tools,
+      }),
+    );
+    expect(resultado).toBe(respostaFalsa);
+  });
+
+  it('parseStructuredFromHistory chama client.messages.parse com o histórico completo', async () => {
+    const respostaFalsa = { parsed_output: { titulo: 'ok' }, usage: { input_tokens: 20, output_tokens: 8 } };
+    const client = {
+      messages: { parse: jest.fn().mockResolvedValue(respostaFalsa) },
+    } as unknown as Anthropic;
+    const service = new AnthropicService(client);
+    const schema = z.object({ titulo: z.string() });
+    const historico = [
+      { role: 'user' as const, content: 'oi' },
+      { role: 'assistant' as const, content: [{ type: 'text', text: 'ok' }] },
+    ];
+
+    const resultado = await service.parseStructuredFromHistory({
+      system: 'sys',
+      messages: historico,
+      model: 'claude-sonnet-5',
+      maxTokens: 4096,
+      schema,
+    });
+
+    expect(client.messages.parse).toHaveBeenCalledWith(
+      expect.objectContaining({ system: 'sys', messages: historico }),
+    );
+    expect(resultado).toBe(respostaFalsa);
+  });
 });

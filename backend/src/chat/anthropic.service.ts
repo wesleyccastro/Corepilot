@@ -19,6 +19,37 @@ export interface ParseStructuredParams {
   schema: z.ZodTypeAny;
 }
 
+export interface MensagemConversa {
+  role: 'user' | 'assistant';
+  content: string | Array<Record<string, unknown>>;
+}
+
+export interface FerramentaTool {
+  name: string;
+  description: string;
+  input_schema: {
+    type: 'object';
+    properties: Record<string, unknown>;
+    required: string[];
+  };
+}
+
+export interface CreateWithToolsParams {
+  system: string;
+  messages: MensagemConversa[];
+  model: string;
+  maxTokens: number;
+  tools: FerramentaTool[];
+}
+
+export interface ParseStructuredFromHistoryParams {
+  system: string;
+  messages: MensagemConversa[];
+  model: string;
+  maxTokens: number;
+  schema: z.ZodTypeAny;
+}
+
 @Injectable()
 export class AnthropicService {
   constructor(@Inject(ANTHROPIC_CLIENT) private readonly client: Anthropic) {}
@@ -40,5 +71,25 @@ export class AnthropicService {
       messages: [{ role: 'user', content: params.mensagem }],
       output_config: { format: zodOutputFormat(params.schema) },
     });
+  }
+
+  async createWithTools(params: CreateWithToolsParams) {
+    return this.client.messages.create({
+      model: params.model,
+      max_tokens: params.maxTokens,
+      system: params.system,
+      messages: params.messages,
+      tools: params.tools,
+    } as Parameters<typeof this.client.messages.create>[0]);
+  }
+
+  async parseStructuredFromHistory(params: ParseStructuredFromHistoryParams) {
+    return this.client.messages.parse({
+      model: params.model,
+      max_tokens: params.maxTokens,
+      system: params.system,
+      messages: params.messages,
+      output_config: { format: zodOutputFormat(params.schema) },
+    } as Parameters<typeof this.client.messages.parse>[0]);
   }
 }

@@ -36,7 +36,7 @@ export class SkillService {
   async findByIdInEmpresa(skillId: string, empresaId: string) {
     const skill = await this.prisma.skill.findFirst({
       where: { id: skillId, agente: { empresaId } },
-      include: { agente: true },
+      include: { agente: true, ferramentas: true },
     });
 
     if (!skill) {
