@@ -3,6 +3,8 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase/client';
 import { apiFetch } from '../api/apiFetch';
 import { CorePilotApp } from '../CorePilotApp';
+import { ModulosList } from '../modulos/ModulosList';
+import type { Modulo } from '../modulos/types';
 
 interface MeResponse {
   usuario: { id: string; nome: string; email: string };
@@ -14,6 +16,7 @@ export function FundacaoStatus({ session }: { session: Session }) {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showPrototype, setShowPrototype] = useState(false);
+  const [moduloSelecionado, setModuloSelecionado] = useState<Modulo | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -61,6 +64,18 @@ export function FundacaoStatus({ session }: { session: Session }) {
         <button onClick={() => setShowPrototype(true)}>Ver protótipo (mock)</button>
         <button onClick={() => supabase.auth.signOut()}>Sair</button>
       </div>
+      <ModulosList
+        accessToken={session.access_token}
+        onAbrirModulo={(modulo) => {
+          setModuloSelecionado(modulo);
+          console.log('Módulo selecionado:', modulo);
+        }}
+      />
+      {moduloSelecionado && (
+        <div style={{ fontSize: 13, color: '#666' }}>
+          Selecionado: {moduloSelecionado.nome} (chat real vem na próxima task)
+        </div>
+      )}
     </div>
   );
 }
