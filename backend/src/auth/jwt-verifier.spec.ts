@@ -55,6 +55,19 @@ describe('createJwtVerifier', () => {
     await expect(verify(token)).rejects.toThrow();
   });
 
+  it('rejeita um token sem a claim sub', async () => {
+    const { privateKey, verify } = await buildVerifier();
+
+    const token = await new SignJWT({ role: 'authenticated' })
+      .setProtectedHeader({ alg: 'ES256', kid: 'test-key' })
+      .setIssuer(issuer)
+      .setAudience('authenticated')
+      .setExpirationTime('1h')
+      .sign(privateKey);
+
+    await expect(verify(token)).rejects.toThrow();
+  });
+
   it('rejeita um token expirado', async () => {
     const { privateKey, verify } = await buildVerifier();
 
