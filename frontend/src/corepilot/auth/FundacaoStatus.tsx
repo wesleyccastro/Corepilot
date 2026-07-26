@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase/client';
 import { apiFetch } from '../api/apiFetch';
 import { CorePilotApp } from '../CorePilotApp';
 import { ModulosList } from '../modulos/ModulosList';
-import { ChatView } from '../modulos/ChatView';
+import { ModuloWorkspace } from '../modulos/ModuloWorkspace';
 import type { Modulo } from '../modulos/types';
 
 interface MeResponse {
@@ -45,7 +45,7 @@ export function FundacaoStatus({ session }: { session: Session }) {
 
   if (moduloSelecionado) {
     return (
-      <ChatView
+      <ModuloWorkspace
         accessToken={session.access_token}
         modulo={moduloSelecionado}
         onVoltar={() => setModuloSelecionado(null)}
