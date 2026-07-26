@@ -1,7 +1,7 @@
-import { CorePilotApp } from './corepilot/CorePilotApp';
+import { AuthGate } from './corepilot/auth/AuthGate';
 
 function App() {
-  return <CorePilotApp />;
+  return <AuthGate />;
 }
 
 export default App;
