@@ -52,6 +52,29 @@ que fala com o Postgres via connection string própria — uma única fonte de
 verdade para regra de negócio e autorização (sem RLS como mecanismo primário
 de autorização, para não duplicar a lógica em duas camadas).
 
+### 3.1. Regra permanente: toda tabela nasce com RLS habilitada e sem policies
+
+Não usar RLS como mecanismo de autorização **não** significa deixar RLS
+desligada. O Postgres do Supabase expõe automaticamente, via PostgREST, uma
+Data API pública em `https://<projeto>.supabase.co/rest/v1/<Tabela>` para toda
+tabela do schema `public` — inclusive as criadas pelo Prisma, que o Supabase
+Studio nunca viu. Como a chave publishable/anon é embarcada no bundle do
+frontend por design, qualquer tabela sem RLS é lida e escrita por qualquer
+pessoa que abra o site, contornando `JwtAuthGuard` e `TenantGuard` por
+completo. Isso foi confirmado na prática nesta fase (um `GET
+/rest/v1/Empresa` com a chave anon retornava linhas reais) e corrigido pela
+migração `20260726073505_lock_down_data_api`.
+
+Regra, válida da Fase 2 em diante e sem exceção: **toda tabela nova recebe
+`ALTER TABLE "<Tabela>" ENABLE ROW LEVEL SECURITY;` na mesma migração que a
+cria, e nenhuma policy é criada.** RLS habilitada com zero policies é negação
+total para os papéis `anon`/`authenticated` do PostgREST, e é invisível para o
+backend: o NestJS conecta via `DATABASE_URL` como dono das tabelas, e o dono
+ignora RLS. Ou seja, o efeito é fechar a porta lateral sem mover uma vírgula
+da autorização, que continua explícita nos services (§5, item 5). Se algum dia
+o acesso direto via PostgREST for realmente desejado para alguma tabela, isso
+vira uma decisão de design explícita — não o default silencioso.
+
 ## 4. Modelo de dados (Prisma)
 
 ```prisma
