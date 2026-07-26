@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase/client';
 import { apiFetch } from '../api/apiFetch';
 import { CorePilotApp } from '../CorePilotApp';
 import { ModulosList } from '../modulos/ModulosList';
+import { ChatView } from '../modulos/ChatView';
 import type { Modulo } from '../modulos/types';
 
 interface MeResponse {
@@ -42,6 +43,16 @@ export function FundacaoStatus({ session }: { session: Session }) {
     return <CorePilotApp />;
   }
 
+  if (moduloSelecionado) {
+    return (
+      <ChatView
+        accessToken={session.access_token}
+        modulo={moduloSelecionado}
+        onVoltar={() => setModuloSelecionado(null)}
+      />
+    );
+  }
+
   return (
     <div style={{ maxWidth: 480, margin: '80px auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
       <h1>CorePilot — Fundação</h1>
@@ -64,18 +75,7 @@ export function FundacaoStatus({ session }: { session: Session }) {
         <button onClick={() => setShowPrototype(true)}>Ver protótipo (mock)</button>
         <button onClick={() => supabase.auth.signOut()}>Sair</button>
       </div>
-      <ModulosList
-        accessToken={session.access_token}
-        onAbrirModulo={(modulo) => {
-          setModuloSelecionado(modulo);
-          console.log('Módulo selecionado:', modulo);
-        }}
-      />
-      {moduloSelecionado && (
-        <div style={{ fontSize: 13, color: '#666' }}>
-          Selecionado: {moduloSelecionado.nome} (chat real vem na próxima task)
-        </div>
-      )}
+      <ModulosList accessToken={session.access_token} onAbrirModulo={setModuloSelecionado} />
     </div>
   );
 }
