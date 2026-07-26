@@ -13,6 +13,7 @@ import { SkillExecucaoModule } from './skill/skill-execucao.module';
 import { FonteDeDadosModule } from './fonte-de-dados/fonte-de-dados.module';
 import { ConsultaModule } from './consulta/consulta.module';
 import { ConsultaTesteModule } from './consulta/consulta-teste.module';
+import { SyncCronModule } from './consulta/sync-cron.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ConsultaTesteModule } from './consulta/consulta-teste.module';
     FonteDeDadosModule,
     ConsultaModule,
     ConsultaTesteModule,
+    SyncCronModule,
   ],
   controllers: [AppController],
   providers: [AppService],
