@@ -16,6 +16,7 @@ model Empresa {
   auditLogs AuditLog[]
   modulos   Modulo[]
   conversas Conversa[]
+  agentes   Agente[]
 }
 
 model Usuario {
@@ -25,9 +26,10 @@ model Usuario {
   email          String   @unique
   criadoEm       DateTime @default(now())
 
-  empresas  UsuarioEmpresa[]
-  auditLogs AuditLog[]
-  conversas Conversa[]
+  empresas       UsuarioEmpresa[]
+  auditLogs      AuditLog[]
+  conversas      Conversa[]
+  skillExecucoes SkillExecucao[]
 }
 
 enum Perfil {
@@ -70,6 +72,7 @@ model Modulo {
 
   empresa   Empresa    @relation(fields: [empresaId], references: [id])
   conversas Conversa[]
+  agentes   Agente[]
 }
 
 model Conversa {
@@ -102,4 +105,45 @@ model Mensagem {
   criadoEm      DateTime      @default(now())
 
   conversa Conversa @relation(fields: [conversaId], references: [id])
+}
+
+model Agente {
+  id        String   @id @default(uuid())
+  empresaId String
+  moduloId  String
+  nome      String
+  funcao    String
+  objetivo  String
+  modeloIA  String   @default("claude-sonnet-5")
+  criadoEm  DateTime @default(now())
+
+  empresa Empresa @relation(fields: [empresaId], references: [id])
+  modulo  Modulo  @relation(fields: [moduloId], references: [id])
+  skills  Skill[]
+}
+
+model Skill {
+  id          String   @id @default(uuid())
+  agenteId    String
+  nome        String
+  objetivo    String
+  camposSaida Json
+  criadoEm    DateTime @default(now())
+
+  agente    Agente          @relation(fields: [agenteId], references: [id])
+  execucoes SkillExecucao[]
+}
+
+model SkillExecucao {
+  id            String   @id @default(uuid())
+  skillId       String
+  usuarioId     String
+  entrada       String
+  saida         Json
+  tokensEntrada Int?
+  tokensSaida   Int?
+  criadoEm      DateTime @default(now())
+
+  skill   Skill   @relation(fields: [skillId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
 }
