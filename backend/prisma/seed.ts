@@ -1,8 +1,27 @@
 import { PrismaClient } from '@prisma/client';
-import { createTestUser } from '../src/testing/supabase-admin.helper';
+import { ensureTestUser } from '../src/testing/supabase-admin.helper';
 import { provisionUsuarioParaEmpresa } from '../src/testing/provision-usuario.helper';
 
 const prisma = new PrismaClient();
+
+/**
+ * A senha das contas de seed nunca é hardcoded: elas são contas reais e
+ * e-mail-confirmadas no projeto Supabase, então um literal no código seria
+ * uma credencial viva commitada. Falha alto e claro se não estiver setada —
+ * sem default.
+ */
+function lerSenhaDeSeed(): string {
+  const senha = process.env.SEED_USER_PASSWORD;
+
+  if (!senha) {
+    throw new Error(
+      'SEED_USER_PASSWORD não configurada. Defina-a em backend/.env.local ' +
+        '(veja backend/.env.example) antes de rodar o seed.',
+    );
+  }
+
+  return senha;
+}
 
 async function encontrarOuCriarEmpresa(nome: string) {
   const existente = await prisma.empresa.findFirst({ where: { nome } });
@@ -10,9 +29,13 @@ async function encontrarOuCriarEmpresa(nome: string) {
   return prisma.empresa.create({ data: { nome } });
 }
 
-async function seedEmpresaComAdmin(nomeEmpresa: string, email: string, password: string) {
+async function seedEmpresaComAdmin(
+  nomeEmpresa: string,
+  email: string,
+  password: string,
+) {
   const empresa = await encontrarOuCriarEmpresa(nomeEmpresa);
-  const authUser = await createTestUser(email, password);
+  const { user: authUser, criado } = await ensureTestUser(email, password);
 
   await provisionUsuarioParaEmpresa(prisma, {
     supabaseUserId: authUser.id,
@@ -22,17 +45,33 @@ async function seedEmpresaComAdmin(nomeEmpresa: string, email: string, password:
     perfil: 'admin',
   });
 
-  console.log(`Seed OK: ${nomeEmpresa} <- ${email}`);
+  const acao = criado ? 'criado' : 'atualizado (senha redefinida)';
+  console.log(`Seed OK: ${nomeEmpresa} <- ${email} [${acao}]`);
 }
 
 async function main() {
-  await seedEmpresaComAdmin('Empresa Seed A', 'seed-a@corepilot.dev', 'Seed123!456');
-  await seedEmpresaComAdmin('Empresa Seed B', 'seed-b@corepilot.dev', 'Seed123!456');
+  const password = lerSenhaDeSeed();
+
+  await seedEmpresaComAdmin('Empresa Seed A', 'seed-a@corepilot.dev', password);
+  await seedEmpresaComAdmin('Empresa Seed B', 'seed-b@corepilot.dev', password);
 }
 
-main()
-  .catch((err) => {
+// try/finally de verdade: o `process.exit(1)` dentro de um `.catch()`
+// encadeado preemptava o `.finally(() => prisma.$disconnect())`, e a conexão
+// nunca era fechada no caminho de erro.
+async function run() {
+  let exitCode = 0;
+
+  try {
+    await main();
+  } catch (err) {
     console.error(err);
-    process.exit(1);
-  })
-  .finally(() => prisma.$disconnect());
+    exitCode = 1;
+  } finally {
+    await prisma.$disconnect();
+  }
+
+  process.exitCode = exitCode;
+}
+
+void run();
