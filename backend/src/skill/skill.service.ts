@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AgenteService } from '../agente/agente.service';
 import type { CreateSkillDto } from './dto/create-skill.dto';
+import type { UpdateSkillDto } from './dto/update-skill.dto';
 
 @Injectable()
 export class SkillService {
@@ -44,5 +45,20 @@ export class SkillService {
     }
 
     return skill;
+  }
+
+  async update(skillId: string, empresaId: string, dto: UpdateSkillDto) {
+    await this.findByIdInEmpresa(skillId, empresaId);
+
+    return this.prisma.skill.update({
+      where: { id: skillId },
+      data: {
+        nome: dto.nome,
+        objetivo: dto.objetivo,
+        camposSaida: dto.camposSaida
+          ? (dto.camposSaida as unknown as Prisma.InputJsonValue)
+          : undefined,
+      },
+    });
   }
 }
