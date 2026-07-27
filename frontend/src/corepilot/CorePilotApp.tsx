@@ -28,7 +28,7 @@ export function CorePilotApp({ accessToken }: { accessToken: string }) {
         {state.view === 'admin-users' && <AdminUsers state={state} actions={actions} />}
         {state.view === 'admin-settings' && <AdminSettings state={state} actions={actions} />}
         {state.view === 'admin-company' && <AdminCompany state={state} actions={actions} />}
-        {activeModule && <CustomModuleView accessToken={accessToken} module={activeModule} state={state} actions={actions} />}
+        {activeModule && <CustomModuleView module={activeModule} state={state} actions={actions} />}
       </div>
 
       <Toast message={state.toast} />
