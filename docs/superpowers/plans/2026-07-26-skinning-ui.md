@@ -300,10 +300,24 @@ import type { UpdateModuloDto } from './dto/update-modulo.dto';
 
     return this.prisma.modulo.update({
       where: { id: moduloId },
-      data: dto,
+      data: {
+        nome: dto.nome,
+        objetivo: dto.objetivo,
+        instrucoes: dto.instrucoes,
+        descricao: dto.descricao,
+        responsavel: dto.responsavel,
+        areas: dto.areas,
+        icone: dto.icone,
+        cor: dto.cor,
+      },
     });
   }
 ```
+
+Nota de segurança: `data: dto` (espalhar o body inteiro direto no Prisma) NUNCA deve ser usado num
+`update` — o DTO é só uma interface TypeScript, sem validação em runtime (`main.ts` não registra
+`ValidationPipe`), então um body malicioso poderia incluir `empresaId` e reatribuir o módulo para
+outra empresa. Sempre listar os campos explicitamente, igual ao `create`.
 
 - [ ] **Step 4: Rodar o teste para ver passar**
 
@@ -388,10 +402,22 @@ não são necessários aqui (o `TenantContext` já basta); a chamada de auditori
   async atualizar(@Param('id') id: string, @Body() body: UpdateModuloDto) {
     const { usuarioId, empresaId } = this.tenantContext.get();
     const resultado = await this.moduloService.update(id, empresaId, body);
-    await this.audit.record({ empresaId, atorUsuarioId: usuarioId, acao: 'modulo_atualizado', dadosDepois: body as Record<string, unknown> });
+    await this.audit.record({
+      empresaId,
+      atorUsuarioId: usuarioId,
+      acao: 'modulo_atualizado',
+      dadosDepois: body as unknown as Prisma.InputJsonValue,
+    });
     return resultado;
   }
 ```
+
+Nota de tipos: `AuditService.record`'s `dadosDepois` espera `Prisma.InputJsonValue | null | undefined`
+(veja `backend/src/audit/audit.service.ts`) — `Record<string, unknown>` **não** é atribuível a esse
+tipo (o `unknown` dos valores não satisfaz `InputJsonValue`), então o cast correto é
+`body as unknown as Prisma.InputJsonValue` (mesmo padrão já usado em `skill.service.ts` para
+`camposSaida`), nunca `as any`. Adicione `import type { Prisma } from '@prisma/client';` ao topo do
+controller.
 
 Use esta segunda versão (com auditoria) como implementação final — adicione `private readonly audit: AuditService,`
 ao construtor.
@@ -546,10 +572,18 @@ import type { UpdateAgenteDto } from './dto/update-agente.dto';
 
     return this.prisma.agente.update({
       where: { id: agenteId },
-      data: dto,
+      data: {
+        nome: dto.nome,
+        funcao: dto.funcao,
+        objetivo: dto.objetivo,
+      },
     });
   }
 ```
+
+Nota de segurança (mesma da Task 2): nunca use `data: dto` num `update` — liste os campos
+explicitamente, para que um body malicioso não consiga sobrescrever `empresaId`/`moduloId` via
+campos extras não previstos no DTO.
 
 - [ ] **Step 4: Rodar o teste para ver passar**
 
@@ -640,12 +674,15 @@ export class AgenteController {
       empresaId,
       atorUsuarioId: usuarioId,
       acao: 'agente_atualizado',
-      dadosDepois: body as Record<string, unknown>,
+      dadosDepois: body as unknown as Prisma.InputJsonValue,
     });
     return resultado;
   }
 }
 ```
+
+Adicione `import type { Prisma } from '@prisma/client';` ao topo deste controller (mesmo motivo da
+Task 2: `dadosDepois` espera `Prisma.InputJsonValue`, não `Record<string, unknown>`).
 
 - [ ] **Step 8: Importar `AuditModule` no `AgenteModule`**
 
@@ -814,6 +851,7 @@ Substitua `backend/src/skill/skill.controller.ts`:
 
 ```typescript
 import { BadRequestException, Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TenantGuard } from '../auth/tenant.guard';
 import { TenantContext } from '../auth/tenant-context';
@@ -861,7 +899,7 @@ export class SkillController {
       empresaId,
       atorUsuarioId: usuarioId,
       acao: 'skill_atualizada',
-      dadosDepois: body as Record<string, unknown>,
+      dadosDepois: body as unknown as Prisma.InputJsonValue,
     });
     return resultado;
   }
