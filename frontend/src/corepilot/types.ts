@@ -311,3 +311,48 @@ export interface DataSourceSummary {
   status: string;
   updated: string;
 }
+
+export interface NovoAgenteForm {
+  nome: string;
+  funcao: string;
+  objetivo: string;
+}
+
+export const emptyNovoAgenteForm: NovoAgenteForm = { nome: '', funcao: '', objetivo: '' };
+
+export interface NovaFonteForm {
+  tipo: string;
+  nome: string;
+  serverUrl: string;
+  username: string;
+  senha: string;
+  codSistema: string;
+  codColigada: string;
+}
+
+export const emptyNovaFonteForm: NovaFonteForm = {
+  tipo: '',
+  nome: '',
+  serverUrl: '',
+  username: '',
+  senha: '',
+  codSistema: '',
+  codColigada: '',
+};
+
+export interface ParametroConsultaForm {
+  chave: string;
+  valor: string;
+}
+
+export interface NovaConsultaForm {
+  fonteDeDadosId: string;
+  nome: string;
+  codSentenca: string;
+  parametros: ParametroConsultaForm[];
+  camposFiltro: import('./agentes/types').CampoSaida[];
+}
+
+export function emptyNovaConsultaForm(): NovaConsultaForm {
+  return { fonteDeDadosId: '', nome: '', codSentenca: '', parametros: [{ chave: '', valor: '' }], camposFiltro: [] };
+}

@@ -3,6 +3,11 @@ export interface Modulo {
   nome: string;
   objetivo: string;
   instrucoes: string | null;
+  descricao: string | null;
+  responsavel: string | null;
+  areas: string | null;
+  icone: string | null;
+  cor: string | null;
   modeloIA: string;
   criadoEm: string;
 }

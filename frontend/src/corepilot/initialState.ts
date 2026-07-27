@@ -26,6 +26,18 @@ import type {
   WizardAgentTab,
 } from './types';
 import { initialGeneralKnowledgeSources, initialKnowledgeSources } from './seedData';
+import type { Agente, CampoSaida, Skill as SkillReal } from './agentes/types';
+import type { FonteDeDados } from './fontes-de-dados/types';
+import type { Consulta, ResultadoTeste } from './consultas/types';
+import type { Mensagem } from './modulos/types';
+import {
+  emptyNovaConsultaForm,
+  emptyNovaFonteForm,
+  emptyNovoAgenteForm,
+  type NovaConsultaForm,
+  type NovaFonteForm,
+  type NovoAgenteForm,
+} from './types';
 
 export interface CorePilotState {
   view: ViewId;
@@ -137,6 +149,49 @@ export interface CorePilotState {
   comprasBasesOpen: boolean;
   financeiroBasesOpen: boolean;
   chatMenuOpenId: string | null;
+
+  // --- Estado real (Wizard / módulo aberto) ---
+  currentModuloId: string | null;
+  wizardSaving: boolean;
+  wizardError: string | null;
+
+  moduloAgentes: Agente[];
+  agentesLoading: boolean;
+  selectedAgenteId: string | null;
+  novoAgenteForm: NovoAgenteForm;
+  showNovoAgenteForm: boolean;
+
+  agenteSkills: SkillReal[];
+  skillsLoading: boolean;
+  editingSkillReal: SkillReal | null;
+  skillFormNome: string;
+  skillFormObjetivo: string;
+  skillFormCampos: CampoSaida[];
+  skillFerramentasSelecionadas: string[];
+
+  moduloFontesDeDados: FonteDeDados[];
+  fontesLoading: boolean;
+  novaFonteForm: NovaFonteForm;
+  showNovaFonteForm: boolean;
+
+  moduloConsultas: Consulta[];
+  consultasLoading: boolean;
+  novaConsultaForm: NovaConsultaForm;
+  showNovaConsultaForm: boolean;
+  testandoConsultaId: string | null;
+  resultadosTesteConsulta: Record<string, ResultadoTeste>;
+
+  skillTestSelecionadaId: string | null;
+  skillTestEntrada: string;
+  skillTestando: boolean;
+  skillTestResultado: { saida: Record<string, unknown>; tokensEntrada: number | null; tokensSaida: number | null } | null;
+  skillTestErro: string | null;
+
+  moduloConversaId: string | null;
+  moduloMensagens: Mensagem[];
+  moduloChatDraft: string;
+  moduloChatEnviando: boolean;
+  moduloChatErro: string | null;
 }
 
 export function createInitialState(): CorePilotState {
@@ -340,5 +395,47 @@ export function createInitialState(): CorePilotState {
     comprasBasesOpen: false,
     financeiroBasesOpen: false,
     chatMenuOpenId: null,
+
+    currentModuloId: null,
+    wizardSaving: false,
+    wizardError: null,
+
+    moduloAgentes: [],
+    agentesLoading: false,
+    selectedAgenteId: null,
+    novoAgenteForm: { ...emptyNovoAgenteForm },
+    showNovoAgenteForm: false,
+
+    agenteSkills: [],
+    skillsLoading: false,
+    editingSkillReal: null,
+    skillFormNome: '',
+    skillFormObjetivo: '',
+    skillFormCampos: [],
+    skillFerramentasSelecionadas: [],
+
+    moduloFontesDeDados: [],
+    fontesLoading: false,
+    novaFonteForm: { ...emptyNovaFonteForm },
+    showNovaFonteForm: false,
+
+    moduloConsultas: [],
+    consultasLoading: false,
+    novaConsultaForm: emptyNovaConsultaForm(),
+    showNovaConsultaForm: false,
+    testandoConsultaId: null,
+    resultadosTesteConsulta: {},
+
+    skillTestSelecionadaId: null,
+    skillTestEntrada: '',
+    skillTestando: false,
+    skillTestResultado: null,
+    skillTestErro: null,
+
+    moduloConversaId: null,
+    moduloMensagens: [],
+    moduloChatDraft: '',
+    moduloChatEnviando: false,
+    moduloChatErro: null,
   };
 }

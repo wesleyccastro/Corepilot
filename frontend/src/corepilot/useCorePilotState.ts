@@ -16,6 +16,28 @@ import type {
   TaskFrequency,
   ViewId,
 } from './types';
+import {
+  criarAgente,
+  atualizarAgente,
+  criarSkill,
+  atualizarSkill,
+  anexarFerramenta,
+  removerFerramenta,
+  listarAgentes,
+  listarSkills,
+  executarSkill,
+} from './agentes/api';
+import { criarFonteDeDados, listarFontesDeDados } from './fontes-de-dados/api';
+import {
+  atualizarSincronizacao,
+  criarConsulta,
+  listarConsultas,
+  testarConsulta,
+} from './consultas/api';
+import { criarConversa, enviarMensagemStreaming, listarConversas, listarMensagens } from './modulos/chatStream';
+import { emptyNovaConsultaForm, emptyNovaFonteForm, emptyNovoAgenteForm } from './types';
+import type { CampoSaida, Skill as SkillReal } from './agentes/types';
+import type { Consulta } from './consultas/types';
 
 type Patch = Partial<CorePilotState> | ((s: CorePilotState) => Partial<CorePilotState> | null);
 type ChatListKey = 'comprasChats' | 'financeiroChats';
@@ -24,7 +46,7 @@ function chatListKeyFor(module: ModuleKey): ChatListKey {
   return module === 'compras' ? 'comprasChats' : 'financeiroChats';
 }
 
-export function useCorePilotState() {
+export function useCorePilotState(accessToken: string) {
   const [state, setState] = useState<CorePilotState>(createInitialState);
   const toastTimer = useRef<number | undefined>(undefined);
   const moduleTimers = useRef<Record<string, number | undefined>>({});
@@ -548,6 +570,281 @@ export function useCorePilotState() {
     }));
   };
 
+  // --- Agentes reais ---
+  const carregarAgentesDoModulo = async (moduloId: string) => {
+    update({ agentesLoading: true });
+    try {
+      const agentes = await listarAgentes(accessToken, moduloId);
+      update({
+        agentesLoading: false,
+        moduloAgentes: agentes,
+        selectedAgenteId: agentes[0]?.id ?? null,
+      });
+      if (agentes[0]) await carregarSkillsDoAgente(agentes[0].id);
+    } catch (err) {
+      update({ agentesLoading: false, wizardError: err instanceof Error ? err.message : 'Erro ao carregar agentes' });
+    }
+  };
+  const selecionarAgente = (agenteId: string) => {
+    update({ selectedAgenteId: agenteId });
+    void carregarSkillsDoAgente(agenteId);
+  };
+  const toggleNovoAgenteForm = () => update((s) => ({ showNovoAgenteForm: !s.showNovoAgenteForm, novoAgenteForm: { ...emptyNovoAgenteForm } }));
+  const updateNovoAgenteField = (field: keyof CorePilotState['novoAgenteForm']) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    update((s) => ({ novoAgenteForm: { ...s.novoAgenteForm, [field]: val } }));
+  };
+  const criarNovoAgenteReal = async () => {
+    const moduloId = state.currentModuloId;
+    if (!moduloId || !state.novoAgenteForm.nome.trim()) return;
+    update({ wizardSaving: true, wizardError: null });
+    try {
+      const agente = await criarAgente(accessToken, moduloId, state.novoAgenteForm);
+      update((s) => ({
+        wizardSaving: false,
+        moduloAgentes: [agente, ...s.moduloAgentes],
+        selectedAgenteId: agente.id,
+        showNovoAgenteForm: false,
+        novoAgenteForm: { ...emptyNovoAgenteForm },
+        agenteSkills: [],
+      }));
+      showToast('Agente criado.');
+    } catch (err) {
+      update({ wizardSaving: false, wizardError: err instanceof Error ? err.message : 'Erro ao criar agente' });
+    }
+  };
+  const atualizarAgenteReal = async (campo: 'nome' | 'funcao' | 'objetivo', valor: string) => {
+    const moduloId = state.currentModuloId;
+    const agenteId = state.selectedAgenteId;
+    if (!moduloId || !agenteId) return;
+    try {
+      const agente = await atualizarAgente(accessToken, moduloId, agenteId, { [campo]: valor });
+      update((s) => ({ moduloAgentes: s.moduloAgentes.map((a) => (a.id === agenteId ? agente : a)) }));
+    } catch (err) {
+      update({ wizardError: err instanceof Error ? err.message : 'Erro ao atualizar agente' });
+    }
+  };
+
+  // --- Skills reais ---
+  const carregarSkillsDoAgente = async (agenteId: string) => {
+    update({ skillsLoading: true });
+    try {
+      const skills = await listarSkills(accessToken, agenteId);
+      update({ skillsLoading: false, agenteSkills: skills });
+    } catch (err) {
+      update({ skillsLoading: false, wizardError: err instanceof Error ? err.message : 'Erro ao carregar skills' });
+    }
+  };
+  const abrirNovaSkill = () => update({
+    editingSkillReal: null,
+    skillFormNome: '',
+    skillFormObjetivo: '',
+    skillFormCampos: [{ nome: '', tipo: 'string', descricao: '', obrigatorio: true }],
+    skillFerramentasSelecionadas: [],
+    agentTab: 'skill-editor',
+  });
+  const abrirEdicaoSkill = (skill: SkillReal) => update({
+    editingSkillReal: skill,
+    skillFormNome: skill.nome,
+    skillFormObjetivo: skill.objetivo,
+    skillFormCampos: skill.camposSaida.length ? skill.camposSaida : [{ nome: '', tipo: 'string', descricao: '', obrigatorio: true }],
+    skillFerramentasSelecionadas: [],
+    agentTab: 'skill-editor',
+  });
+  const cancelarEdicaoSkill = () => update({ editingSkillReal: null, agentTab: 'skills' });
+  const updateSkillFormNome = (e: ChangeEvent<HTMLInputElement>) => update({ skillFormNome: e.target.value });
+  const updateSkillFormObjetivo = (e: ChangeEvent<HTMLTextAreaElement>) => update({ skillFormObjetivo: e.target.value });
+  const adicionarCampoSaida = () => update((s) => ({ skillFormCampos: [...s.skillFormCampos, { nome: '', tipo: 'string', descricao: '', obrigatorio: true }] }));
+  const atualizarCampoSaida = (indice: number, parcial: Partial<CampoSaida>) => update((s) => ({ skillFormCampos: s.skillFormCampos.map((c, i) => (i === indice ? { ...c, ...parcial } : c)) }));
+  const removerCampoSaida = (indice: number) => update((s) => ({ skillFormCampos: s.skillFormCampos.filter((_, i) => i !== indice) }));
+  const toggleFerramentaSkill = (consultaId: string) => update((s) => ({
+    skillFerramentasSelecionadas: s.skillFerramentasSelecionadas.includes(consultaId)
+      ? s.skillFerramentasSelecionadas.filter((id) => id !== consultaId)
+      : [...s.skillFerramentasSelecionadas, consultaId],
+  }));
+  const salvarSkillReal = async () => {
+    const agenteId = state.selectedAgenteId;
+    if (!agenteId || !state.skillFormNome.trim() || !state.skillFormObjetivo.trim()) return;
+    update({ wizardSaving: true, wizardError: null });
+    try {
+      const camposSaida = state.skillFormCampos.filter((c) => c.nome.trim());
+      const existente = state.editingSkillReal;
+      const skill = existente
+        ? await atualizarSkill(accessToken, agenteId, existente.id, { nome: state.skillFormNome, objetivo: state.skillFormObjetivo, camposSaida })
+        : await criarSkill(accessToken, agenteId, { nome: state.skillFormNome, objetivo: state.skillFormObjetivo, camposSaida });
+
+      const ferramentasAntes = new Set((existente as { ferramentas?: { id: string }[] } | null)?.ferramentas?.map((f) => f.id) ?? []);
+      const ferramentasDepois = new Set(state.skillFerramentasSelecionadas);
+      for (const id of ferramentasDepois) if (!ferramentasAntes.has(id)) await anexarFerramenta(accessToken, skill.id, id);
+      for (const id of ferramentasAntes) if (!ferramentasDepois.has(id)) await removerFerramenta(accessToken, skill.id, id);
+
+      update((s) => ({
+        wizardSaving: false,
+        agenteSkills: existente ? s.agenteSkills.map((sk) => (sk.id === skill.id ? skill : sk)) : [skill, ...s.agenteSkills],
+        editingSkillReal: null,
+        agentTab: 'skills',
+      }));
+      showToast('Skill salva com sucesso.');
+    } catch (err) {
+      update({ wizardSaving: false, wizardError: err instanceof Error ? err.message : 'Erro ao salvar skill' });
+    }
+  };
+
+  // --- Fontes de dados reais ---
+  const carregarFontesDeDados = async () => {
+    update({ fontesLoading: true });
+    try {
+      const fontes = await listarFontesDeDados(accessToken);
+      update({ fontesLoading: false, moduloFontesDeDados: fontes });
+    } catch (err) {
+      update({ fontesLoading: false, wizardError: err instanceof Error ? err.message : 'Erro ao carregar fontes de dados' });
+    }
+  };
+  const toggleNovaFonteForm = () => update((s) => ({ showNovaFonteForm: !s.showNovaFonteForm, novaFonteForm: { ...emptyNovaFonteForm } }));
+  const updateNovaFonteField = (field: keyof CorePilotState['novaFonteForm']) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const val = e.target.value;
+    update((s) => ({ novaFonteForm: { ...s.novaFonteForm, [field]: val } }));
+  };
+  const salvarNovaFonteReal = async () => {
+    const f = state.novaFonteForm;
+    if (!f.tipo || !f.nome.trim()) return;
+    update({ wizardSaving: true, wizardError: null });
+    try {
+      const fonte = await criarFonteDeDados(accessToken, f);
+      update((s) => ({
+        wizardSaving: false,
+        moduloFontesDeDados: [fonte, ...s.moduloFontesDeDados],
+        showNovaFonteForm: false,
+        novaFonteForm: { ...emptyNovaFonteForm },
+      }));
+      showToast('Fonte de dados conectada.');
+    } catch (err) {
+      update({ wizardSaving: false, wizardError: err instanceof Error ? err.message : 'Erro ao conectar fonte de dados' });
+    }
+  };
+
+  // --- Consultas reais ---
+  const carregarConsultasDoModulo = async (moduloId: string) => {
+    update({ consultasLoading: true });
+    try {
+      const consultas = await listarConsultas(accessToken, moduloId);
+      update({ consultasLoading: false, moduloConsultas: consultas });
+    } catch (err) {
+      update({ consultasLoading: false, wizardError: err instanceof Error ? err.message : 'Erro ao carregar consultas' });
+    }
+  };
+  const toggleNovaConsultaForm = () => update((s) => ({ showNovaConsultaForm: !s.showNovaConsultaForm, novaConsultaForm: emptyNovaConsultaForm() }));
+  const updateNovaConsultaField = (field: 'fonteDeDadosId' | 'nome' | 'codSentenca') => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const val = e.target.value;
+    update((s) => ({ novaConsultaForm: { ...s.novaConsultaForm, [field]: val } }));
+  };
+  const adicionarParametroConsulta = () => update((s) => ({ novaConsultaForm: { ...s.novaConsultaForm, parametros: [...s.novaConsultaForm.parametros, { chave: '', valor: '' }] } }));
+  const atualizarParametroConsulta = (indice: number, parcial: Partial<{ chave: string; valor: string }>) => update((s) => ({
+    novaConsultaForm: { ...s.novaConsultaForm, parametros: s.novaConsultaForm.parametros.map((p, i) => (i === indice ? { ...p, ...parcial } : p)) },
+  }));
+  const adicionarCampoFiltroConsulta = () => update((s) => ({ novaConsultaForm: { ...s.novaConsultaForm, camposFiltro: [...s.novaConsultaForm.camposFiltro, { nome: '', tipo: 'string', descricao: '', obrigatorio: true }] } }));
+  const atualizarCampoFiltroConsulta = (indice: number, parcial: Partial<CampoSaida>) => update((s) => ({
+    novaConsultaForm: { ...s.novaConsultaForm, camposFiltro: s.novaConsultaForm.camposFiltro.map((c, i) => (i === indice ? { ...c, ...parcial } : c)) },
+  }));
+  const salvarNovaConsultaReal = async () => {
+    const moduloId = state.currentModuloId;
+    const f = state.novaConsultaForm;
+    if (!moduloId || !f.fonteDeDadosId || !f.nome.trim() || !f.codSentenca.trim()) return;
+    update({ wizardSaving: true, wizardError: null });
+    try {
+      const parametrosSincronizacao = Object.fromEntries(f.parametros.filter((p) => p.chave.trim()).map((p) => [p.chave, p.valor]));
+      const consulta = await criarConsulta(accessToken, moduloId, {
+        fonteDeDadosId: f.fonteDeDadosId,
+        nome: f.nome,
+        codSentenca: f.codSentenca,
+        parametrosSincronizacao,
+        camposFiltro: f.camposFiltro.filter((c) => c.nome.trim()),
+      });
+      update((s) => ({
+        wizardSaving: false,
+        moduloConsultas: [consulta, ...s.moduloConsultas],
+        showNovaConsultaForm: false,
+        novaConsultaForm: emptyNovaConsultaForm(),
+      }));
+      showToast('Consulta criada.');
+    } catch (err) {
+      update({ wizardSaving: false, wizardError: err instanceof Error ? err.message : 'Erro ao criar consulta' });
+    }
+  };
+  const testarConsultaReal = async (consultaId: string) => {
+    update({ testandoConsultaId: consultaId });
+    try {
+      const resultado = await testarConsulta(accessToken, consultaId);
+      update((s) => ({ resultadosTesteConsulta: { ...s.resultadosTesteConsulta, [consultaId]: resultado } }));
+      const moduloId = state.currentModuloId;
+      if (moduloId) await carregarConsultasDoModulo(moduloId);
+    } catch (err) {
+      update((s) => ({
+        resultadosTesteConsulta: { ...s.resultadosTesteConsulta, [consultaId]: { sucesso: false, erro: err instanceof Error ? err.message : 'Erro ao testar' } },
+      }));
+    } finally {
+      update({ testandoConsultaId: null });
+    }
+  };
+  const toggleSincronizacaoConsultaReal = async (consulta: Consulta) => {
+    const atualizada = await atualizarSincronizacao(accessToken, consulta.id, !consulta.sincronizacaoAtiva, consulta.intervaloSincronizacaoMinutos ?? 60);
+    update((s) => ({ moduloConsultas: s.moduloConsultas.map((c) => (c.id === atualizada.id ? atualizada : c)) }));
+  };
+
+  // --- Testar skill real ---
+  const selecionarSkillParaTeste = (skillId: string) => update({ skillTestSelecionadaId: skillId, skillTestResultado: null, skillTestErro: null });
+  const updateSkillTestEntrada = (e: ChangeEvent<HTMLTextAreaElement>) => update({ skillTestEntrada: e.target.value });
+  const executarTesteSkillReal = async () => {
+    const skillId = state.skillTestSelecionadaId;
+    if (!skillId || !state.skillTestEntrada.trim()) return;
+    update({ skillTestando: true, skillTestErro: null });
+    try {
+      const resultado = await executarSkill(accessToken, skillId, state.skillTestEntrada);
+      update({ skillTestando: false, skillTestResultado: resultado });
+    } catch (err) {
+      update({ skillTestando: false, skillTestErro: err instanceof Error ? err.message : 'Erro ao executar skill' });
+    }
+  };
+
+  // --- Chat real do módulo ---
+  const carregarConversaDoModulo = async (moduloId: string) => {
+    try {
+      const conversas = await listarConversas(accessToken, moduloId);
+      const conversa = conversas[0] ?? (await criarConversa(accessToken, moduloId));
+      const mensagens = await listarMensagens(accessToken, conversa.id);
+      update({ moduloConversaId: conversa.id, moduloMensagens: mensagens });
+    } catch (err) {
+      update({ moduloChatErro: err instanceof Error ? err.message : 'Erro ao carregar conversa' });
+    }
+  };
+  const updateModuloChatDraft = (e: ChangeEvent<HTMLTextAreaElement>) => update({ moduloChatDraft: e.target.value });
+  const enviarMensagemModuloReal = async () => {
+    const conversaId = state.moduloConversaId;
+    const texto = state.moduloChatDraft.trim();
+    if (!conversaId || !texto || state.moduloChatEnviando) return;
+    update({ moduloChatDraft: '', moduloChatEnviando: true, moduloChatErro: null });
+
+    const idUsuario = 'local-' + Date.now();
+    const idAgente = 'local-' + (Date.now() + 1);
+    update((s) => ({
+      moduloMensagens: [
+        ...s.moduloMensagens,
+        { id: idUsuario, conversaId, papel: 'usuario' as const, conteudo: texto, tokensEntrada: null, tokensSaida: null, criadoEm: new Date().toISOString() },
+        { id: idAgente, conversaId, papel: 'agente' as const, conteudo: '', tokensEntrada: null, tokensSaida: null, criadoEm: new Date().toISOString() },
+      ],
+    }));
+
+    let respostaAcumulada = '';
+    await enviarMensagemStreaming(accessToken, conversaId, texto, {
+      onDelta: (delta) => {
+        respostaAcumulada += delta;
+        update((s) => ({ moduloMensagens: s.moduloMensagens.map((m) => (m.id === idAgente ? { ...m, conteudo: respostaAcumulada } : m)) }));
+      },
+      onDone: () => update({ moduloChatEnviando: false }),
+      onErro: (mensagem) => update({ moduloChatEnviando: false, moduloChatErro: mensagem }),
+    });
+  };
+
   const actions = {
     showToast, setView, goStep, setAgentTab, selectCard, closeCard, approveCard, rejectCard, requestChanges,
     updateModuleField, selectIcon, selectColor, updateAgentField, selectModel, updateInstructions,
@@ -575,6 +872,15 @@ export function useCorePilotState() {
     togglePermissionProfile, toggleNewProfileForm, updateNewProfileName, saveNewProfile,
     toggleNewUserForm, updateNewUserField, toggleNewUserProfile, saveNewUser,
     chatListKeyFor,
+
+    carregarAgentesDoModulo, selecionarAgente, toggleNovoAgenteForm, updateNovoAgenteField, criarNovoAgenteReal, atualizarAgenteReal,
+    carregarSkillsDoAgente, abrirNovaSkill, abrirEdicaoSkill, cancelarEdicaoSkill, updateSkillFormNome, updateSkillFormObjetivo,
+    adicionarCampoSaida, atualizarCampoSaida, removerCampoSaida, toggleFerramentaSkill, salvarSkillReal,
+    carregarFontesDeDados, toggleNovaFonteForm, updateNovaFonteField, salvarNovaFonteReal,
+    carregarConsultasDoModulo, toggleNovaConsultaForm, updateNovaConsultaField, adicionarParametroConsulta, atualizarParametroConsulta,
+    adicionarCampoFiltroConsulta, atualizarCampoFiltroConsulta, salvarNovaConsultaReal, testarConsultaReal, toggleSincronizacaoConsultaReal,
+    selecionarSkillParaTeste, updateSkillTestEntrada, executarTesteSkillReal,
+    carregarConversaDoModulo, updateModuloChatDraft, enviarMensagemModuloReal,
   };
 
   return {

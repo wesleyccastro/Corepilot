@@ -102,3 +102,45 @@ export async function removerFerramenta(
   });
   if (!response.ok) throw new Error(`Falha ao remover ferramenta (status ${response.status})`);
 }
+
+export interface AtualizarAgenteDto {
+  nome?: string;
+  funcao?: string;
+  objetivo?: string;
+}
+
+export async function atualizarAgente(
+  accessToken: string,
+  moduloId: string,
+  agenteId: string,
+  dto: AtualizarAgenteDto,
+): Promise<Agente> {
+  const response = await apiFetch(`/modulos/${moduloId}/agentes/${agenteId}`, accessToken, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(dto),
+  });
+  if (!response.ok) throw new Error(`Falha ao atualizar agente (status ${response.status})`);
+  return (await response.json()) as Agente;
+}
+
+export interface AtualizarSkillDto {
+  nome?: string;
+  objetivo?: string;
+  camposSaida?: CampoSaida[];
+}
+
+export async function atualizarSkill(
+  accessToken: string,
+  agenteId: string,
+  skillId: string,
+  dto: AtualizarSkillDto,
+): Promise<Skill> {
+  const response = await apiFetch(`/agentes/${agenteId}/skills/${skillId}`, accessToken, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(dto),
+  });
+  if (!response.ok) throw new Error(`Falha ao atualizar skill (status ${response.status})`);
+  return (await response.json()) as Skill;
+}

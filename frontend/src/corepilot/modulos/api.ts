@@ -5,6 +5,11 @@ export interface CriarModuloDto {
   nome: string;
   objetivo: string;
   instrucoes?: string;
+  descricao?: string;
+  responsavel?: string;
+  areas?: string;
+  icone?: string;
+  cor?: string;
 }
 
 export async function listarModulos(accessToken: string): Promise<Modulo[]> {
@@ -24,5 +29,30 @@ export async function criarModulo(accessToken: string, dto: CriarModuloDto): Pro
   if (!response.ok) {
     throw new Error(`Falha ao criar módulo (status ${response.status})`);
   }
+  return (await response.json()) as Modulo;
+}
+
+export interface AtualizarModuloDto {
+  nome?: string;
+  objetivo?: string;
+  instrucoes?: string;
+  descricao?: string;
+  responsavel?: string;
+  areas?: string;
+  icone?: string;
+  cor?: string;
+}
+
+export async function atualizarModulo(
+  accessToken: string,
+  moduloId: string,
+  dto: AtualizarModuloDto,
+): Promise<Modulo> {
+  const response = await apiFetch(`/modulos/${moduloId}`, accessToken, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(dto),
+  });
+  if (!response.ok) throw new Error(`Falha ao atualizar módulo (status ${response.status})`);
   return (await response.json()) as Modulo;
 }
