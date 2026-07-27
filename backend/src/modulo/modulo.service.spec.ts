@@ -9,6 +9,7 @@ describe('ModuloService', () => {
         create: jest.fn(),
         findMany: jest.fn(),
         findFirst: jest.fn(),
+        update: jest.fn(),
       },
     } as unknown as PrismaService;
   }
@@ -91,5 +92,30 @@ describe('ModuloService', () => {
     const resultado = await service.findByIdInEmpresa('modulo-1', 'empresa-1');
 
     expect(resultado).toBe(modulo);
+  });
+
+  it('update atualiza só os campos informados, escopado à empresa', async () => {
+    const prisma = buildPrismaMock();
+    (prisma.modulo.findFirst as jest.Mock).mockResolvedValue({ id: 'modulo-1', empresaId: 'empresa-1' });
+    (prisma.modulo.update as jest.Mock).mockResolvedValue({ id: 'modulo-1', nome: 'Novo nome' });
+    const service = new ModuloService(prisma);
+
+    const resultado = await service.update('modulo-1', 'empresa-1', { nome: 'Novo nome' });
+
+    expect(prisma.modulo.findFirst).toHaveBeenCalledWith({ where: { id: 'modulo-1', empresaId: 'empresa-1' } });
+    expect(prisma.modulo.update).toHaveBeenCalledWith({
+      where: { id: 'modulo-1' },
+      data: { nome: 'Novo nome' },
+    });
+    expect(resultado).toEqual({ id: 'modulo-1', nome: 'Novo nome' });
+  });
+
+  it('update lança NotFoundException se o módulo não existir na empresa', async () => {
+    const prisma = buildPrismaMock();
+    (prisma.modulo.findFirst as jest.Mock).mockResolvedValue(null);
+    const service = new ModuloService(prisma);
+
+    await expect(service.update('modulo-x', 'empresa-1', { nome: 'X' })).rejects.toThrow(NotFoundException);
+    expect(prisma.modulo.update).not.toHaveBeenCalled();
   });
 });

@@ -8,11 +8,16 @@ describe('ModuloController', () => {
     return { get: () => ({ usuarioId: 'usuario-1', empresaId, perfil: 'admin' as const }) } as unknown as TenantContext;
   }
 
+  function buildAudit() {
+    return { record: jest.fn() } as unknown as import('../audit/audit.service').AuditService;
+  }
+
   it('cria um módulo usando a empresa do tenant atual', async () => {
     const service = {
       create: jest.fn().mockResolvedValue({ id: 'modulo-1' }),
     } as unknown as ModuloService;
-    const controller = new ModuloController(service, buildTenantContext('empresa-1'));
+    const audit = buildAudit();
+    const controller = new ModuloController(service, audit, buildTenantContext('empresa-1'));
 
     const resultado = await controller.criar({ nome: 'Compras', objetivo: 'Ajudar com compras' });
 
@@ -25,7 +30,8 @@ describe('ModuloController', () => {
 
   it('rejeita criação sem nome ou objetivo', async () => {
     const service = { create: jest.fn() } as unknown as ModuloService;
-    const controller = new ModuloController(service, buildTenantContext('empresa-1'));
+    const audit = buildAudit();
+    const controller = new ModuloController(service, audit, buildTenantContext('empresa-1'));
 
     await expect(controller.criar({ nome: '', objetivo: 'x' })).rejects.toThrow(BadRequestException);
     await expect(controller.criar({ nome: 'x', objetivo: '  ' })).rejects.toThrow(BadRequestException);
@@ -36,11 +42,31 @@ describe('ModuloController', () => {
     const service = {
       findAllByEmpresa: jest.fn().mockResolvedValue([{ id: 'modulo-1' }]),
     } as unknown as ModuloService;
-    const controller = new ModuloController(service, buildTenantContext('empresa-1'));
+    const audit = buildAudit();
+    const controller = new ModuloController(service, audit, buildTenantContext('empresa-1'));
 
     const resultado = await controller.listar();
 
     expect(service.findAllByEmpresa).toHaveBeenCalledWith('empresa-1');
     expect(resultado).toEqual([{ id: 'modulo-1' }]);
+  });
+
+  it('atualiza um módulo da empresa do tenant atual e audita', async () => {
+    const service = {
+      update: jest.fn().mockResolvedValue({ id: 'modulo-1', nome: 'Novo nome' }),
+    } as unknown as ModuloService;
+    const audit = buildAudit();
+    const controller = new ModuloController(service, audit, buildTenantContext('empresa-1'));
+
+    const resultado = await controller.atualizar('modulo-1', { nome: 'Novo nome' });
+
+    expect(service.update).toHaveBeenCalledWith('modulo-1', 'empresa-1', { nome: 'Novo nome' });
+    expect(audit.record).toHaveBeenCalledWith({
+      empresaId: 'empresa-1',
+      atorUsuarioId: 'usuario-1',
+      acao: 'modulo_atualizado',
+      dadosDepois: { nome: 'Novo nome' },
+    });
+    expect(resultado).toEqual({ id: 'modulo-1', nome: 'Novo nome' });
   });
 });

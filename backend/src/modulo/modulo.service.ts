@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateModuloDto } from './dto/create-modulo.dto';
+import type { UpdateModuloDto } from './dto/update-modulo.dto';
 
 @Injectable()
 export class ModuloService {
@@ -39,5 +40,14 @@ export class ModuloService {
     }
 
     return modulo;
+  }
+
+  async update(moduloId: string, empresaId: string, dto: UpdateModuloDto) {
+    await this.findByIdInEmpresa(moduloId, empresaId);
+
+    return this.prisma.modulo.update({
+      where: { id: moduloId },
+      data: dto,
+    });
   }
 }
