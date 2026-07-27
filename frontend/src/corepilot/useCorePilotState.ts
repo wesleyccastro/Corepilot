@@ -211,24 +211,20 @@ export function useCorePilotState(accessToken: string) {
   };
   const setTestResult = (r: string) => update({ testResult: r });
 
-  const publishModule = () => {
+  const publishModule = async () => {
+    const isMockEdit = state.editingModule === 'compras' || state.editingModule === 'financeiro';
+    if (!isMockEdit) {
+      const ok = await salvarModuloReal();
+      if (!ok) return;
+    }
     if (state.editingModule) {
       const target = state.editingModule;
-      if (!target.startsWith('module:')) {
-        // compras/financeiro: fluxo mock inalterado.
-        update({ view: target, editingModule: null });
-        showToast('Alterações salvas.');
-        return;
-      }
-      // Módulo real existente: a Task 12 substitui este bloco pela chamada real de salvar.
-      update({ editingModule: null, view: target });
+      update({ view: target, editingModule: null });
       showToast('Alterações salvas.');
       return;
     }
-    // Módulo novo: a Task 7 (Step1) já cria o módulo real ao avançar do passo 1 — quando o
-    // usuário chega aqui (Step6) o módulo já existe de verdade. A Task 12 substitui este bloco
-    // por uma chamada real de finalização.
-    showToast('Módulo publicado.');
+    update((s) => ({ view: `module:${s.currentModuloId}` as ViewId, editingModule: null }));
+    showToast('Módulo publicado. Já está disponível na navegação.');
   };
   const saveDraft = () => showToast('Rascunho salvo.');
   const testModule = () => showToast('Abrindo ambiente de teste do módulo…');
