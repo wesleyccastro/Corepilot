@@ -2985,10 +2985,19 @@ git commit -m "feat(frontend): aba Testar agente executa skill real"
 **Files:**
 - Modify: `frontend/src/corepilot/views/wizard/Step6Review.tsx`
 - Modify: `frontend/src/corepilot/useCorePilotState.ts`
+- Modify: `frontend/src/corepilot/views/wizard/Wizard.tsx`
 
 **Interfaces:**
 - Consumes: `salvarModuloReal` (Task 7).
 - Produces: `publishModule` final (substitui o placeholder da Task 6).
+
+**Nota (achado da revisão desta task):** a barra superior do Wizard (`Wizard.tsx`, visível em
+TODOS os passos, não só no Step6) tem dois botões nunca tocados por nenhuma task: "Salvar
+rascunho"/"Salvar alterações" (chama `saveDraft`, um toast falso — duplica e engana o usuário,
+já que quando editando um módulo real ele mostra o mesmo texto "Salvar alterações" do botão real
+do Step6, mas não salva nada) e "Testar módulo" (chama `testModule`, outro toast falso — a spec
+original já decidia que esse botão deveria levar direto à aba "Testar agente" do Step4, decisão
+que nunca virou uma step concreta em nenhuma task). Ambos corrigidos abaixo.
 
 - [ ] **Step 1: Reescrever o resumo do Step6**
 
@@ -3075,12 +3084,37 @@ Substitua o `publishModule` (placeholder da Task 6) em `frontend/src/corepilot/u
   };
 ```
 
-- [ ] **Step 4: Rodar o build**
+- [ ] **Step 4: Remover o botão fake "Salvar rascunho"/"Salvar alterações" e redirecionar "Testar módulo"**
+
+Em `frontend/src/corepilot/views/wizard/Wizard.tsx`, substitua a barra de botões do topo (o `<div>`
+com `justifyContent: 'flex-end'` contendo os dois `<button>`):
+
+```typescript
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginBottom: 18 }}>
+          <button
+            onClick={() => {
+              actions.goStep(4);
+              actions.setAgentTab('test');
+            }}
+            style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '9px 15px', fontSize: 13, fontWeight: 600, color: colors.navy, cursor: 'pointer' }}
+          >
+            Testar módulo
+          </button>
+        </div>
+```
+
+O botão "Salvar rascunho"/"Salvar alterações" (chamava `saveDraft`, um toast falso) é removido —
+salvar já é a ação real do Step6 (`publishModule`), não há mais um botão redundante e enganoso em
+toda tela do Wizard. "Testar módulo" agora leva direto à aba "Testar agente" do Step4 (decisão já
+tomada na spec original desta fase, nunca implementada até agora), reaproveitando as ações
+`goStep`/`setAgentTab` que já existem.
+
+- [ ] **Step 5: Rodar o build**
 
 Run: `cd frontend && npm run build`
 Expected: build limpo.
 
-- [ ] **Step 5: Verificação manual completa do fluxo do Wizard**
+- [ ] **Step 6: Verificação manual completa do fluxo do Wizard**
 
 Fluxo de ponta a ponta com backend/frontend rodando: "+ Criar módulo" → Step1 (nome/objetivo) →
 Step3 (conectar fonte, criar consulta) → Step4 (criar agente, criar skill com campo de saída,
@@ -3091,11 +3125,13 @@ anexar ferramenta de dados, testar) → Step6 → "Publicar módulo". Confirme q
   (fonte e consulta criadas aparecem) e Step4 (agente e skill criados aparecem).
 - Editar "Compras" continua funcionando exatamente como antes (sem chamadas reais de rede para
   `/modulos`).
+- Em qualquer passo do Wizard, clicar "Testar módulo" leva ao Step4, aba "Testar agente" — não há
+  mais botão "Salvar rascunho"/"Salvar alterações" na barra superior em nenhum passo.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add frontend/src/corepilot/views/wizard/Step6Review.tsx frontend/src/corepilot/useCorePilotState.ts
+git add frontend/src/corepilot/views/wizard/Step6Review.tsx frontend/src/corepilot/useCorePilotState.ts frontend/src/corepilot/views/wizard/Wizard.tsx
 git commit -m "feat(frontend): Step6 do Wizard com resumo real e publicação unificada"
 ```
 
