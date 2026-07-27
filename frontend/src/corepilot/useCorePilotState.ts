@@ -226,6 +226,7 @@ export function useCorePilotState(accessToken: string) {
   const testModule = () => showToast('Abrindo ambiente de teste do módulo…');
 
   const salvarModuloReal = async (): Promise<boolean> => {
+    if (state.wizardSaving) return false;
     const dto = {
       nome: state.moduleForm.name,
       objetivo: state.moduleForm.objective,
@@ -279,7 +280,26 @@ export function useCorePilotState(accessToken: string) {
   });
   const editModule = (viewName: ViewId) => {
     if (viewName === 'compras' || viewName === 'financeiro') {
-      update({ view: 'wizard', wizardStep: 1, editingModule: viewName, previousView: viewName });
+      // moduleForm/instructions são compartilhados com o Wizard de módulos reais — "Criar
+      // módulo" (viewWizardNew) os zera. Restaurar os valores mock aqui, sempre, protege esta
+      // tela mock de qualquer reset anterior, sem depender de nunca ter sido tocada.
+      update({
+        view: 'wizard',
+        wizardStep: 1,
+        editingModule: viewName,
+        previousView: viewName,
+        moduleForm: {
+          name: 'Operações Agrícolas',
+          description: 'Ambiente para analisar planejamento, execução, produtividade e custos das operações agrícolas.',
+          objective: 'Unificar dados de safra, fazendas e talhões para decisões mais rápidas e confiáveis.',
+          owner: 'Marcos Silva',
+          areas: 'Todas as fazendas · LFG Agro',
+          icon: 'leaf',
+          color: '#0EA5A0',
+        },
+        instructions:
+          'Você é um analista agrícola corporativo. Utilize somente as fontes autorizadas no módulo. Sempre informe safra, empresa, fazenda, período e origem dos dados. Não presuma valores ausentes. Quando houver inconsistência, apresente o problema e solicite validação.',
+      });
       return;
     }
     const moduloId = viewName.replace('module:', '');

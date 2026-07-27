@@ -66,7 +66,9 @@ export function Wizard({ state, actions }: { state: CorePilotState; actions: Cor
             <button onClick={actions.prevStep} style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '10px 18px', fontSize: 13.5, fontWeight: 600, color: colors.navy, cursor: 'pointer' }}>Voltar</button>
           ) : <span />}
           {state.wizardStep < 6 && (
-            <button onClick={actions.nextStep} style={{ background: colors.navy, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>Continuar</button>
+            <button onClick={actions.nextStep} disabled={state.wizardSaving} style={{ background: colors.navy, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>
+              {state.wizardSaving ? 'Salvando…' : 'Continuar'}
+            </button>
           )}
         </div>
       </div>
