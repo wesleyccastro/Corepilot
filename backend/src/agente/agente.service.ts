@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ModuloService } from '../modulo/modulo.service';
 import type { CreateAgenteDto } from './dto/create-agente.dto';
+import type { UpdateAgenteDto } from './dto/update-agente.dto';
 
 @Injectable()
 export class AgenteService {
@@ -44,5 +45,18 @@ export class AgenteService {
     }
 
     return agente;
+  }
+
+  async update(agenteId: string, empresaId: string, dto: UpdateAgenteDto) {
+    await this.findByIdInEmpresa(agenteId, empresaId);
+
+    return this.prisma.agente.update({
+      where: { id: agenteId },
+      data: {
+        nome: dto.nome,
+        funcao: dto.funcao,
+        objetivo: dto.objetivo,
+      },
+    });
   }
 }
