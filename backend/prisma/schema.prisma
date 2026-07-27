@@ -63,13 +63,18 @@ model AuditLog {
 }
 
 model Modulo {
-  id         String   @id @default(uuid())
-  empresaId  String
-  nome       String
-  objetivo   String
-  instrucoes String?
-  modeloIA   String   @default("claude-sonnet-5")
-  criadoEm   DateTime @default(now())
+  id          String   @id @default(uuid())
+  empresaId   String
+  nome        String
+  objetivo    String
+  instrucoes  String?
+  descricao   String?
+  responsavel String?
+  areas       String?
+  icone       String?
+  cor         String?
+  modeloIA    String   @default("claude-sonnet-5")
+  criadoEm    DateTime @default(now())
 
   empresa   Empresa                 @relation(fields: [empresaId], references: [id])
   conversas Conversa[]

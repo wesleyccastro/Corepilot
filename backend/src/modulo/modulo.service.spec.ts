@@ -13,7 +13,7 @@ describe('ModuloService', () => {
     } as unknown as PrismaService;
   }
 
-  it('cria um módulo escopado à empresa informada', async () => {
+  it('cria um módulo escopado à empresa informada, com campos de identidade visual', async () => {
     const prisma = buildPrismaMock();
     (prisma.modulo.create as jest.Mock).mockResolvedValue({
       id: 'modulo-1',
@@ -21,6 +21,11 @@ describe('ModuloService', () => {
       nome: 'Compras',
       objetivo: 'Ajudar com compras',
       instrucoes: null,
+      descricao: 'Módulo de compras',
+      responsavel: 'Marcos Silva',
+      areas: 'Matriz',
+      icone: 'cart',
+      cor: '#0EA5A0',
       modeloIA: 'claude-sonnet-5',
     });
     const service = new ModuloService(prisma);
@@ -28,6 +33,11 @@ describe('ModuloService', () => {
     const resultado = await service.create('empresa-1', {
       nome: 'Compras',
       objetivo: 'Ajudar com compras',
+      descricao: 'Módulo de compras',
+      responsavel: 'Marcos Silva',
+      areas: 'Matriz',
+      icone: 'cart',
+      cor: '#0EA5A0',
     });
 
     expect(prisma.modulo.create).toHaveBeenCalledWith({
@@ -36,6 +46,11 @@ describe('ModuloService', () => {
         nome: 'Compras',
         objetivo: 'Ajudar com compras',
         instrucoes: undefined,
+        descricao: 'Módulo de compras',
+        responsavel: 'Marcos Silva',
+        areas: 'Matriz',
+        icone: 'cart',
+        cor: '#0EA5A0',
       },
     });
     expect(resultado.id).toBe('modulo-1');

@@ -13,6 +13,11 @@ export class ModuloService {
         nome: dto.nome,
         objetivo: dto.objetivo,
         instrucoes: dto.instrucoes,
+        descricao: dto.descricao,
+        responsavel: dto.responsavel,
+        areas: dto.areas,
+        icone: dto.icone,
+        cor: dto.cor,
       },
     });
   }
