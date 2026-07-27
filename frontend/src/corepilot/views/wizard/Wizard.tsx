@@ -48,10 +48,15 @@ export function Wizard({ state, actions }: { state: CorePilotState; actions: Cor
 
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginBottom: 18 }}>
-          <button onClick={actions.saveDraft} style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '9px 15px', fontSize: 13, fontWeight: 600, color: colors.navy, cursor: 'pointer' }}>
-            {isEditing ? 'Salvar alterações' : 'Salvar rascunho'}
+          <button
+            onClick={() => {
+              actions.goStep(4);
+              actions.setAgentTab('test');
+            }}
+            style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '9px 15px', fontSize: 13, fontWeight: 600, color: colors.navy, cursor: 'pointer' }}
+          >
+            Testar módulo
           </button>
-          <button onClick={actions.testModule} style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '9px 15px', fontSize: 13, fontWeight: 600, color: colors.navy, cursor: 'pointer' }}>Testar módulo</button>
         </div>
 
         {state.wizardStep === 1 && <Step1Identity state={state} actions={actions} />}
