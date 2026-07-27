@@ -1,4 +1,14 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TenantGuard } from '../auth/tenant.guard';
 import { TenantContext } from '../auth/tenant-context';
@@ -36,8 +46,12 @@ export class ModuloController {
   async atualizar(@Param('id') id: string, @Body() body: UpdateModuloDto) {
     const { usuarioId, empresaId } = this.tenantContext.get();
     const resultado = await this.moduloService.update(id, empresaId, body);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await this.audit.record({ empresaId, atorUsuarioId: usuarioId, acao: 'modulo_atualizado', dadosDepois: body as any });
+    await this.audit.record({
+      empresaId,
+      atorUsuarioId: usuarioId,
+      acao: 'modulo_atualizado',
+      dadosDepois: body as unknown as Prisma.InputJsonValue,
+    });
     return resultado;
   }
 }

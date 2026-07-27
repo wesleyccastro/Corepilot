@@ -47,7 +47,16 @@ export class ModuloService {
 
     return this.prisma.modulo.update({
       where: { id: moduloId },
-      data: dto,
+      data: {
+        nome: dto.nome,
+        objetivo: dto.objetivo,
+        instrucoes: dto.instrucoes,
+        descricao: dto.descricao,
+        responsavel: dto.responsavel,
+        areas: dto.areas,
+        icone: dto.icone,
+        cor: dto.cor,
+      },
     });
   }
 }
