@@ -18,6 +18,11 @@ export function Step1Identity({ state, actions }: { state: CorePilotState; actio
     <div style={{ ...card, padding: 28 }}>
       <h2 style={{ fontSize: 19, fontWeight: 800, color: colors.navy, margin: '0 0 4px' }}>Identidade do módulo</h2>
       <p style={{ fontSize: 13, color: colors.textFaint, margin: '0 0 22px' }}>Este módulo será exibido dinamicamente na navegação para os usuários autorizados.</p>
+      {state.wizardError && (
+        <div style={{ background: colors.dangerBg, color: colors.danger, borderRadius: 8, padding: '10px 14px', fontSize: 12.5, fontWeight: 600, marginBottom: 16 }}>
+          {state.wizardError}
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 560 }}>
         <div>
           <label style={label}>Nome do módulo</label>

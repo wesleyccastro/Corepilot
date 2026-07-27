@@ -28,7 +28,7 @@ import {
   executarSkill,
 } from './agentes/api';
 import { criarFonteDeDados, listarFontesDeDados } from './fontes-de-dados/api';
-import { listarModulos } from './modulos/api';
+import { atualizarModulo, criarModulo, listarModulos } from './modulos/api';
 import {
   atualizarSincronizacao,
   criarConsulta,
@@ -89,7 +89,11 @@ export function useCorePilotState(accessToken: string) {
   };
 
   const setView = (v: ViewId) => update({ view: v, comprasCard: null });
-  const goStep = (n: number) => update({ wizardStep: n });
+  const goStep = (n: number) => {
+    const bloqueado = n > 1 && !state.currentModuloId && state.editingModule !== 'compras' && state.editingModule !== 'financeiro';
+    if (bloqueado) return;
+    update({ wizardStep: n });
+  };
   const setAgentTab = (tab: CorePilotState['agentTab']) => update({ agentTab: tab, editingSkill: null });
   const selectCard = (id: string) => update({ comprasCard: id });
   const closeCard = () => update({ comprasCard: null });
@@ -220,10 +224,87 @@ export function useCorePilotState(accessToken: string) {
   };
   const saveDraft = () => showToast('Rascunho salvo.');
   const testModule = () => showToast('Abrindo ambiente de teste do módulo…');
-  const nextStep = () => update((s) => ({ wizardStep: Math.min(6, s.wizardStep + 1) }));
+
+  const salvarModuloReal = async (): Promise<boolean> => {
+    const dto = {
+      nome: state.moduleForm.name,
+      objetivo: state.moduleForm.objective,
+      instrucoes: state.instructions,
+      descricao: state.moduleForm.description,
+      responsavel: state.moduleForm.owner,
+      areas: state.moduleForm.areas,
+      icone: state.moduleForm.icon,
+      cor: state.moduleForm.color,
+    };
+    if (!dto.nome.trim() || !dto.objetivo.trim()) {
+      update({ wizardError: 'Nome e objetivo do módulo são obrigatórios.' });
+      return false;
+    }
+    update({ wizardSaving: true, wizardError: null });
+    try {
+      if (state.currentModuloId) {
+        const atualizado = await atualizarModulo(accessToken, state.currentModuloId, dto);
+        update((s) => ({
+          wizardSaving: false,
+          publishedModules: s.publishedModules.map((m) => (m.id === atualizado.id ? atualizado : m)),
+        }));
+      } else {
+        const criado = await criarModulo(accessToken, dto);
+        update((s) => ({ wizardSaving: false, currentModuloId: criado.id, publishedModules: [criado, ...s.publishedModules] }));
+      }
+      return true;
+    } catch (err) {
+      update({ wizardSaving: false, wizardError: err instanceof Error ? err.message : 'Erro ao salvar módulo' });
+      return false;
+    }
+  };
+
+  const nextStep = async () => {
+    const precisaSalvar = state.wizardStep === 1 && state.editingModule !== 'compras' && state.editingModule !== 'financeiro';
+    if (precisaSalvar) {
+      const ok = await salvarModuloReal();
+      if (!ok) return;
+    }
+    update((s) => ({ wizardStep: Math.min(6, s.wizardStep + 1) }));
+  };
   const prevStep = () => update((s) => ({ wizardStep: Math.max(1, s.wizardStep - 1) }));
-  const viewWizardNew = () => update({ view: 'wizard', wizardStep: 1, editingModule: null });
-  const editModule = (viewName: ViewId) => update({ view: 'wizard', wizardStep: 1, editingModule: viewName, previousView: viewName });
+  const viewWizardNew = () => update({
+    view: 'wizard', wizardStep: 1, editingModule: null, wizardError: null,
+    currentModuloId: null,
+    moduleForm: { name: '', description: '', objective: '', owner: '', areas: '', icon: 'leaf', color: '#0EA5A0' },
+    instructions: '',
+    moduloAgentes: [], selectedAgenteId: null, agenteSkills: [],
+    moduloConsultas: [],
+    agentTab: 'identity' as const,
+  });
+  const editModule = (viewName: ViewId) => {
+    if (viewName === 'compras' || viewName === 'financeiro') {
+      update({ view: 'wizard', wizardStep: 1, editingModule: viewName, previousView: viewName });
+      return;
+    }
+    const moduloId = viewName.replace('module:', '');
+    const modulo = state.publishedModules.find((m) => m.id === moduloId);
+    if (!modulo) return;
+    update({
+      view: 'wizard', wizardStep: 1, editingModule: viewName, previousView: viewName, wizardError: null,
+      currentModuloId: modulo.id,
+      moduleForm: {
+        name: modulo.nome,
+        description: modulo.descricao ?? '',
+        objective: modulo.objetivo,
+        owner: modulo.responsavel ?? '',
+        areas: modulo.areas ?? '',
+        icon: modulo.icone ?? 'leaf',
+        color: modulo.cor ?? '#0EA5A0',
+      },
+      instructions: modulo.instrucoes ?? '',
+      selectedAgenteId: null,
+      agenteSkills: [],
+      agentTab: 'identity' as const,
+    });
+    void carregarAgentesDoModulo(modulo.id);
+    void carregarConsultasDoModulo(modulo.id);
+  };
   const editComprasModule = () => editModule('compras');
   const editFinanceiroModule = () => editModule('financeiro');
   const editActiveModule = () => editModule(state.view);
@@ -867,7 +948,7 @@ export function useCorePilotState(accessToken: string) {
     toggleTool, toggleNewTaskForm, updateTaskField, setTaskFrequency, setTaskAutonomy, toggleTaskMenu, closeTaskMenu,
     toggleTaskActive, editTask, removeTask, saveTask, setAutonomy,
     openNewSkill, editSkill, duplicateSkill, updateSkillField, setSkillAutonomy, saveSkill, cancelSkillEdit,
-    askSuggested, setTestResult, publishModule, saveDraft, testModule, nextStep, prevStep, viewWizardNew,
+    askSuggested, setTestResult, publishModule, saveDraft, testModule, salvarModuloReal, nextStep, prevStep, viewWizardNew,
     editModule, editComprasModule, editFinanceiroModule, editActiveModule, backFromWizardEdit,
     setComprasBoard, setComprasChat, toggleComprasBases, toggleFinanceiroBases, closeBasesMenus,
     toggleChatMenu, closeChatMenu, togglePinChat, hideChat, deleteChat, restoreChat,
