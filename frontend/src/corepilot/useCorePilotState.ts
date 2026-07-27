@@ -125,6 +125,14 @@ export function useCorePilotState(accessToken: string) {
   };
   const selectModel = (model: string) => update((s) => ({ agentForm: { ...s.agentForm, model } }));
   const updateInstructions = (e: ChangeEvent<HTMLTextAreaElement>) => update({ instructions: e.target.value });
+  const salvarInstrucoesReal = async () => {
+    if (!state.currentModuloId) return;
+    try {
+      await atualizarModulo(accessToken, state.currentModuloId, { instrucoes: state.instructions });
+    } catch (err) {
+      update({ wizardError: err instanceof Error ? err.message : 'Erro ao salvar instruções' });
+    }
+  };
 
   const toggleTool = (idx: number) => update((s) => ({ tools: s.tools.map((t, i) => (i === idx ? { ...t, active: !t.active } : t)) }));
 
@@ -964,7 +972,7 @@ export function useCorePilotState(accessToken: string) {
 
   const actions = {
     showToast, setView, goStep, setAgentTab, selectCard, closeCard, approveCard, rejectCard, requestChanges,
-    updateModuleField, selectIcon, selectColor, updateAgentField, selectModel, updateInstructions,
+    updateModuleField, selectIcon, selectColor, updateAgentField, selectModel, updateInstructions, salvarInstrucoesReal,
     toggleTool, toggleNewTaskForm, updateTaskField, setTaskFrequency, setTaskAutonomy, toggleTaskMenu, closeTaskMenu,
     toggleTaskActive, editTask, removeTask, saveTask, setAutonomy,
     openNewSkill, editSkill, duplicateSkill, updateSkillField, setSkillAutonomy, saveSkill, cancelSkillEdit,
