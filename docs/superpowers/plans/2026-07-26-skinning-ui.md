@@ -1992,6 +1992,7 @@ git commit -m "feat(frontend): AuthGate e Header reais — login vai direto para
 **Files:**
 - Modify: `frontend/src/corepilot/useCorePilotState.ts`
 - Modify: `frontend/src/corepilot/views/wizard/Step1Identity.tsx`
+- Modify: `frontend/src/corepilot/views/wizard/Wizard.tsx`
 
 **Interfaces:**
 - Consumes: `criarModulo`/`atualizarModulo` (`modulos/api.ts`, Task 5), `carregarAgentesDoModulo`/
@@ -2013,6 +2014,7 @@ Adicione esta função dentro de `useCorePilotState`, antes da definição de `n
 
 ```typescript
   const salvarModuloReal = async (): Promise<boolean> => {
+    if (state.wizardSaving) return false;
     const dto = {
       nome: state.moduleForm.name,
       objetivo: state.moduleForm.objective,
@@ -2094,7 +2096,26 @@ Substitua a definição existente de `editModule`:
 ```typescript
   const editModule = (viewName: ViewId) => {
     if (viewName === 'compras' || viewName === 'financeiro') {
-      update({ view: 'wizard', wizardStep: 1, editingModule: viewName, previousView: viewName });
+      // moduleForm/instructions são compartilhados com o Wizard de módulos reais — "Criar
+      // módulo" (viewWizardNew) os zera. Restaurar os valores mock aqui, sempre, protege esta
+      // tela mock de qualquer reset anterior, sem depender de nunca ter sido tocada.
+      update({
+        view: 'wizard',
+        wizardStep: 1,
+        editingModule: viewName,
+        previousView: viewName,
+        moduleForm: {
+          name: 'Operações Agrícolas',
+          description: 'Ambiente para analisar planejamento, execução, produtividade e custos das operações agrícolas.',
+          objective: 'Unificar dados de safra, fazendas e talhões para decisões mais rápidas e confiáveis.',
+          owner: 'Marcos Silva',
+          areas: 'Todas as fazendas · LFG Agro',
+          icon: 'leaf',
+          color: '#0EA5A0',
+        },
+        instructions:
+          'Você é um analista agrícola corporativo. Utilize somente as fontes autorizadas no módulo. Sempre informe safra, empresa, fazenda, período e origem dos dados. Não presuma valores ausentes. Quando houver inconsistência, apresente o problema e solicite validação.',
+      });
       return;
     }
     const moduloId = viewName.replace('module:', '');
@@ -2135,12 +2156,28 @@ descritivo (antes do `<div style={{ display: 'flex', flexDirection: 'column', ga
       )}
 ```
 
-- [ ] **Step 7: Rodar o build**
+- [ ] **Step 7: Desabilitar "Continuar" enquanto salva (evita duplo-clique criar dois módulos)**
+
+Em `frontend/src/corepilot/views/wizard/Wizard.tsx`, localize o botão "Continuar" (dentro do bloco
+`{state.wizardStep < 6 && (...)}`) e adicione `disabled`:
+
+```typescript
+          {state.wizardStep < 6 && (
+            <button onClick={actions.nextStep} disabled={state.wizardSaving} style={{ background: colors.navy, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>
+              {state.wizardSaving ? 'Salvando…' : 'Continuar'}
+            </button>
+          )}
+```
+
+O guard `if (state.wizardSaving) return false;` já adicionado a `salvarModuloReal` (Step 2) cobre o
+caso de o clique ainda passar (ex.: tecla Enter); isso aqui é a defesa visual complementar.
+
+- [ ] **Step 8: Rodar o build**
 
 Run: `cd frontend && npm run build`
 Expected: build limpo.
 
-- [ ] **Step 8: Verificação manual**
+- [ ] **Step 9: Verificação manual**
 
 Com backend e frontend rodando, logado como `seed-a@corepilot.dev`:
 - Clique "+ Criar módulo". No Step1, deixe "Nome do módulo" vazio e clique "Continuar" — deve
@@ -2151,14 +2188,16 @@ Com backend e frontend rodando, logado como `seed-a@corepilot.dev`:
   Visão Geral).
 - Volte ao Step1 (botão "Voltar"), mude o nome, clique "Continuar" de novo — confirme (pelo nome
   atualizado na aba do Header) que foi um `PATCH`, não um segundo módulo criado.
-- Abra "Compras" → engrenagem de edição (ou o fluxo equivalente hoje existente para editar o módulo
-  mock) e confirme que o Step1 dele continua idêntico a antes (sem `wizardError`, sem travar
+- Clique "+ Criar módulo" de novo (sem completar o fluxo), depois abra "Compras" → engrenagem de
+  edição e confirme que o Step1 dele mostra "Operações Agrícolas" e os demais valores mock
+  originais — não campos em branco (é exatamente esse cenário que o Achado 1 da revisão corrigiu).
+- Confirme que o Step1 de Compras continua idêntico a antes (sem `wizardError`, sem travar
   navegação entre passos).
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
-git add frontend/src/corepilot/useCorePilotState.ts frontend/src/corepilot/views/wizard/Step1Identity.tsx
+git add frontend/src/corepilot/useCorePilotState.ts frontend/src/corepilot/views/wizard/Step1Identity.tsx frontend/src/corepilot/views/wizard/Wizard.tsx
 git commit -m "feat(frontend): Wizard cria/atualiza módulo real no Step1, com trava de navegação até o primeiro save"
 ```
 
