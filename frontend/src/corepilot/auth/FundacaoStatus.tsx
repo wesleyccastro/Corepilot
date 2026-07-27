@@ -40,7 +40,7 @@ export function FundacaoStatus({ session }: { session: Session }) {
   }, [session.access_token]);
 
   if (showPrototype) {
-    return <CorePilotApp />;
+    return <CorePilotApp accessToken={session.access_token} />;
   }
 
   if (moduloSelecionado) {

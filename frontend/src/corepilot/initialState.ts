@@ -16,7 +16,6 @@ import type {
   NewUserForm,
   PermissionRow,
   Profile,
-  PublishedModule,
   SemanticField,
   Skill,
   TestMessage,
@@ -29,7 +28,7 @@ import { initialGeneralKnowledgeSources, initialKnowledgeSources } from './seedD
 import type { Agente, CampoSaida, Skill as SkillReal } from './agentes/types';
 import type { FonteDeDados } from './fontes-de-dados/types';
 import type { Consulta, ResultadoTeste } from './consultas/types';
-import type { Mensagem } from './modulos/types';
+import type { Mensagem, Modulo } from './modulos/types';
 import {
   emptyNovaConsultaForm,
   emptyNovaFonteForm,
@@ -44,7 +43,9 @@ export interface CorePilotState {
   previousView: ViewId;
   userMenuOpen: boolean;
   toast: string | null;
-  publishedModules: PublishedModule[];
+  publishedModules: Modulo[];
+  modulesLoading: boolean;
+  modulesError: string | null;
   editingModule: ViewId | null;
 
   kanban: KanbanColumn[];
@@ -201,6 +202,8 @@ export function createInitialState(): CorePilotState {
     userMenuOpen: false,
     toast: null,
     publishedModules: [],
+    modulesLoading: true,
+    modulesError: null,
     editingModule: null,
 
     kanban: [

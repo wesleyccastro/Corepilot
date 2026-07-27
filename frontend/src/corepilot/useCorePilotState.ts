@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { createInitialState, type CorePilotState } from './initialState';
 import { comprasReplies, financeiroReplies, overviewReplies, semanticMeanings } from './seedData';
@@ -28,6 +28,7 @@ import {
   executarSkill,
 } from './agentes/api';
 import { criarFonteDeDados, listarFontesDeDados } from './fontes-de-dados/api';
+import { listarModulos } from './modulos/api';
 import {
   atualizarSincronizacao,
   criarConsulta,
@@ -65,6 +66,21 @@ export function useCorePilotState(accessToken: string) {
       return delta ? { ...s, ...delta } : s;
     });
   };
+
+  useEffect(() => {
+    let cancelado = false;
+    listarModulos(accessToken)
+      .then((modulos) => {
+        if (!cancelado) update({ publishedModules: modulos, modulesLoading: false });
+      })
+      .catch((err: Error) => {
+        if (!cancelado) update({ modulesLoading: false, modulesError: err.message });
+      });
+    return () => {
+      cancelado = true;
+    };
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken]);
 
   const showToast = (msg: string) => {
     window.clearTimeout(toastTimer.current);
@@ -186,21 +202,21 @@ export function useCorePilotState(accessToken: string) {
   const publishModule = () => {
     if (state.editingModule) {
       const target = state.editingModule;
-      update((s) => ({
-        publishedModules: target.startsWith('module:')
-          ? s.publishedModules.map((m) => ('module:' + m.id === target ? { ...m, name: s.moduleForm.name, color: s.moduleForm.color } : m))
-          : s.publishedModules,
-        view: target,
-        editingModule: null,
-      }));
+      if (!target.startsWith('module:')) {
+        // compras/financeiro: fluxo mock inalterado.
+        update({ view: target, editingModule: null });
+        showToast('Alterações salvas.');
+        return;
+      }
+      // Módulo real existente: a Task 12 substitui este bloco pela chamada real de salvar.
+      update({ editingModule: null, view: target });
       showToast('Alterações salvas.');
       return;
     }
-    update((s) => {
-      const mod = { id: 'op-agricolas', name: s.moduleForm.name, color: s.moduleForm.color };
-      return { publishedModules: [...s.publishedModules.filter((m) => m.id !== mod.id), mod], view: 'module:op-agricolas' as ViewId, wizardStep: 1, agentTab: 'identity' as const };
-    });
-    showToast('Módulo publicado. Já está disponível na navegação.');
+    // Módulo novo: a Task 7 (Step1) já cria o módulo real ao avançar do passo 1 — quando o
+    // usuário chega aqui (Step6) o módulo já existe de verdade. A Task 12 substitui este bloco
+    // por uma chamada real de finalização.
+    showToast('Módulo publicado.');
   };
   const saveDraft = () => showToast('Rascunho salvo.');
   const testModule = () => showToast('Abrindo ambiente de teste do módulo…');

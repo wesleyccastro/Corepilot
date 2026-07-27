@@ -1,4 +1,5 @@
 import { useCorePilotState } from './useCorePilotState';
+import { useMe } from './useMe';
 import { Header } from './components/Header';
 import { Toast } from './components/Toast';
 import { Overview } from './views/Overview';
@@ -10,13 +11,14 @@ import { AdminUsers } from './views/admin/AdminUsers';
 import { AdminSettings } from './views/admin/AdminSettings';
 import { AdminCompany } from './views/admin/AdminCompany';
 
-export function CorePilotApp() {
-  const { state, actions, refs } = useCorePilotState();
+export function CorePilotApp({ accessToken }: { accessToken: string }) {
+  const { state, actions, refs } = useCorePilotState(accessToken);
+  const { me } = useMe(accessToken);
   const activeModule = state.publishedModules.find((m) => state.view === `module:${m.id}`);
 
   return (
     <div style={{ height: '100vh', background: '#F7F8F6', color: '#1F2A2E', position: 'relative', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <Header state={state} actions={actions} />
+      <Header state={state} actions={actions} me={me} />
 
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         {state.view === 'overview' && <Overview state={state} actions={actions} scrollRef={refs.overviewScrollRef} />}
@@ -26,7 +28,7 @@ export function CorePilotApp() {
         {state.view === 'admin-users' && <AdminUsers state={state} actions={actions} />}
         {state.view === 'admin-settings' && <AdminSettings state={state} actions={actions} />}
         {state.view === 'admin-company' && <AdminCompany state={state} actions={actions} />}
-        {activeModule && <CustomModuleView module={activeModule} state={state} actions={actions} />}
+        {activeModule && <CustomModuleView accessToken={accessToken} module={activeModule} state={state} actions={actions} />}
       </div>
 
       <Toast message={state.toast} />
