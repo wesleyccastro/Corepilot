@@ -240,12 +240,6 @@ export interface WaForm {
   phone: string;
 }
 
-export interface PublishedModule {
-  id: string;
-  name: string;
-  color: string;
-}
-
 export interface TestMessage {
   role: 'user' | 'agent';
   text: string;
