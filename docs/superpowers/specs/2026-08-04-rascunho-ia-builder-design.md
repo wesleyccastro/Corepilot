@@ -48,7 +48,7 @@ controller é escopado ao seu recurso: `ModuloController`, `AgenteController`, e
 
 ```
 Frontend (Wizard, step 4)                    Backend (NestJS)                      Anthropic
-  Step2Knowledge/aba "Instruções" ──────▶  ModuloController
+  step4/Instructions.tsx ("Instruções") ▶  ModuloController
     [Gerar rascunho com IA]                  POST /modulos/:id/rascunho-instrucoes
                                                  monta prompt (nome+objetivo do módulo
                                                  + brief) ──▶ AnthropicService.parseStructured ──▶ Messages API
@@ -134,8 +134,9 @@ caixa, chama o callback `onRascunho(dados)` do consumidor).
 
 Uso nos três locais:
 
-- **Aba Instruções do módulo** (`Step2Knowledge`/instruções): `onRascunho` seta o
-  `useState` local do textarea (mesmo campo que já existe, salva no blur).
+- **Aba Instruções** (`step4/Instructions.tsx`, campo `Modulo.instrucoes` apesar de
+  editado dentro do step "Agente e instruções"): `onRascunho` seta o `useState`
+  (`state.instructions`) já existente, que salva no blur.
 - **Aba Identidade do agente** (`step4/Identity.tsx`): `onRascunho` seta os dois
   `useState` locais (`guardrails`, `regraEscalonamento`) — mesmo padrão de blur-para-
   salvar já implementado.
