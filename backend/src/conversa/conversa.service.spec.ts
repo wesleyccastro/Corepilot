@@ -13,6 +13,9 @@ describe('ConversaService', () => {
         update: jest.fn(),
         delete: jest.fn(),
       },
+      conversaTag: {
+        findFirst: jest.fn(),
+      },
       mensagem: {
         deleteMany: jest.fn(),
       },
@@ -113,6 +116,67 @@ describe('ConversaService', () => {
       NotFoundException,
     );
     expect(prisma.conversa.update).not.toHaveBeenCalled();
+  });
+
+  it('update valida que a tag pertence ao módulo da conversa antes de atualizar', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.conversa.findFirst as jest.Mock).mockResolvedValue({
+      id: 'conversa-1',
+      usuarioId: 'usuario-1',
+      moduloId: 'modulo-1',
+    });
+    (prisma.conversaTag.findFirst as jest.Mock).mockResolvedValue({ id: 'tag-1', moduloId: 'modulo-1' });
+    (prisma.conversa.update as jest.Mock).mockResolvedValue({ id: 'conversa-1', tagId: 'tag-1' });
+    const service = new ConversaService(prisma, moduloService);
+
+    const resultado = await service.update('conversa-1', 'usuario-1', { tagId: 'tag-1' });
+
+    expect(prisma.conversaTag.findFirst).toHaveBeenCalledWith({
+      where: { id: 'tag-1', moduloId: 'modulo-1' },
+    });
+    expect(prisma.conversa.update).toHaveBeenCalledWith({
+      where: { id: 'conversa-1' },
+      data: { titulo: undefined, arquivada: undefined, fixada: undefined, tagId: 'tag-1' },
+    });
+    expect(resultado).toEqual({ id: 'conversa-1', tagId: 'tag-1' });
+  });
+
+  it('update lança NotFoundException se a tag não pertencer ao módulo da conversa (não atualiza)', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.conversa.findFirst as jest.Mock).mockResolvedValue({
+      id: 'conversa-1',
+      usuarioId: 'usuario-1',
+      moduloId: 'modulo-1',
+    });
+    (prisma.conversaTag.findFirst as jest.Mock).mockResolvedValue(null);
+    const service = new ConversaService(prisma, moduloService);
+
+    await expect(service.update('conversa-1', 'usuario-1', { tagId: 'tag-de-outra-empresa' })).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(prisma.conversaTag.findFirst).toHaveBeenCalledWith({
+      where: { id: 'tag-de-outra-empresa', moduloId: 'modulo-1' },
+    });
+    expect(prisma.conversa.update).not.toHaveBeenCalled();
+  });
+
+  it('update não valida tag quando tagId é null (caso de remover a tag)', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.conversa.findFirst as jest.Mock).mockResolvedValue({
+      id: 'conversa-1',
+      usuarioId: 'usuario-1',
+      moduloId: 'modulo-1',
+    });
+    (prisma.conversa.update as jest.Mock).mockResolvedValue({ id: 'conversa-1', tagId: null });
+    const service = new ConversaService(prisma, moduloService);
+
+    await service.update('conversa-1', 'usuario-1', { tagId: null });
+
+    expect(prisma.conversaTag.findFirst).not.toHaveBeenCalled();
+    expect(prisma.conversa.update).toHaveBeenCalledWith({
+      where: { id: 'conversa-1' },
+      data: { titulo: undefined, arquivada: undefined, fixada: undefined, tagId: null },
+    });
   });
 
   it('remove apaga as mensagens e depois a conversa, após confirmar posse', async () => {

@@ -45,7 +45,16 @@ export class ConversaService {
   }
 
   async update(conversaId: string, usuarioId: string, dto: AtualizarConversaDto) {
-    await this.findOwned(conversaId, usuarioId);
+    const conversa = await this.findOwned(conversaId, usuarioId);
+
+    if (dto.tagId !== undefined && dto.tagId !== null) {
+      const tag = await this.prisma.conversaTag.findFirst({
+        where: { id: dto.tagId, moduloId: conversa.moduloId },
+      });
+      if (!tag) {
+        throw new NotFoundException('Tag não encontrada');
+      }
+    }
 
     return this.prisma.conversa.update({
       where: { id: conversaId },
