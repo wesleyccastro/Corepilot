@@ -28,7 +28,7 @@ import { initialGeneralKnowledgeSources, initialKnowledgeSources } from './seedD
 import type { Agente, CampoSaida, Skill as SkillReal } from './agentes/types';
 import type { FonteDeDados } from './fontes-de-dados/types';
 import type { Consulta, ResultadoTeste } from './consultas/types';
-import type { Mensagem, Modulo } from './modulos/types';
+import type { Conversa, ConversaTag, Mensagem, Modulo } from './modulos/types';
 import {
   emptyEditFonteForm,
   emptyNovaConsultaForm,
@@ -198,6 +198,18 @@ export interface CorePilotState {
   moduloChatEnviando: boolean;
   moduloChatErro: string | null;
   moduloChatStatus: string | null;
+
+  moduloConversas: Conversa[];
+  moduloConversasLoading: boolean;
+  moduloConversasSearch: string;
+  moduloTags: ConversaTag[];
+  moduloActiveTagId: string;
+  moduloTagsExpanded: boolean;
+  moduloShowNewTagForm: boolean;
+  moduloNewTagName: string;
+  moduloArchiveView: boolean;
+  moduloBasesOpen: boolean;
+  moduloBasesConectadas: string[];
 }
 
 export function createInitialState(): CorePilotState {
@@ -448,5 +460,17 @@ export function createInitialState(): CorePilotState {
     moduloChatEnviando: false,
     moduloChatErro: null,
     moduloChatStatus: null,
+
+    moduloConversas: [],
+    moduloConversasLoading: false,
+    moduloConversasSearch: '',
+    moduloTags: [],
+    moduloActiveTagId: 'all',
+    moduloTagsExpanded: false,
+    moduloShowNewTagForm: false,
+    moduloNewTagName: '',
+    moduloArchiveView: false,
+    moduloBasesOpen: false,
+    moduloBasesConectadas: [],
   };
 }
