@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { CorePilotState } from '../../../initialState';
 import type { CorePilotActions } from '../../../useCorePilotState';
 import { colors, input, label } from '../../../styles';
+import { GerarRascunhoButton } from '../../../components/GerarRascunhoButton';
 
 export function AgentIdentityTab({ state, actions }: { state: CorePilotState; actions: CorePilotActions }) {
   const agente = state.moduloAgentes.find((a) => a.id === state.selectedAgenteId);
@@ -52,6 +53,15 @@ export function AgentIdentityTab({ state, actions }: { state: CorePilotState; ac
           onChange={(e) => setObjetivo(e.target.value)}
           onBlur={() => objetivo !== agente.objetivo && void actions.atualizarAgenteReal('objetivo', objetivo)}
           style={{ ...input, width: '100%', resize: 'vertical' }}
+        />
+      </div>
+      <div>
+        <GerarRascunhoButton
+          onGerar={async (brief) => {
+            const rascunho = await actions.gerarRascunhoGuardrailsAgente(agente.id, brief);
+            setGuardrails(rascunho.guardrails);
+            setRegraEscalonamento(rascunho.regraEscalonamento);
+          }}
         />
       </div>
       <div>
