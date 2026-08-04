@@ -27,7 +27,7 @@ import {
   listarSkills,
   executarSkill,
 } from './agentes/api';
-import { criarFonteDeDados, listarFontesDeDados } from './fontes-de-dados/api';
+import { atualizarFonteDeDados, criarFonteDeDados, listarFontesDeDados } from './fontes-de-dados/api';
 import { atualizarModulo, criarModulo, listarModulos } from './modulos/api';
 import {
   atualizarSincronizacao,
@@ -36,7 +36,7 @@ import {
   testarConsulta,
 } from './consultas/api';
 import { criarConversa, enviarMensagemStreaming, listarConversas, listarMensagens } from './modulos/chatStream';
-import { emptyNovaConsultaForm, emptyNovaFonteForm, emptyNovoAgenteForm } from './types';
+import { emptyEditFonteForm, emptyNovaConsultaForm, emptyNovaFonteForm, emptyNovoAgenteForm } from './types';
 import type { CampoSaida, Skill as SkillReal } from './agentes/types';
 import type { Consulta } from './consultas/types';
 
@@ -843,6 +843,53 @@ export function useCorePilotState(accessToken: string) {
       update({ wizardSaving: false, wizardError: err instanceof Error ? err.message : 'Erro ao conectar fonte de dados' });
     }
   };
+  const editarFonte = (fonteId: string) => {
+    const fonte = state.moduloFontesDeDados.find((f) => f.id === fonteId);
+    if (!fonte) return;
+    update({
+      editingFonteId: fonteId,
+      wizardError: null,
+      editFonteForm: {
+        nome: fonte.nome,
+        serverUrl: fonte.configuracao.serverUrl,
+        username: fonte.configuracao.username,
+        senha: '',
+        codSistema: fonte.configuracao.codSistema,
+        codColigada: fonte.configuracao.codColigada,
+      },
+    });
+  };
+  const cancelarEdicaoFonte = () => update({ editingFonteId: null, editFonteForm: { ...emptyEditFonteForm } });
+  const updateEditFonteField = (field: keyof CorePilotState['editFonteForm']) => (e: ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    update((s) => ({ editFonteForm: { ...s.editFonteForm, [field]: val } }));
+  };
+  const salvarEdicaoFonte = async () => {
+    const fonteId = state.editingFonteId;
+    if (!fonteId) return;
+    const f = state.editFonteForm;
+    update({ wizardSaving: true, wizardError: null });
+    try {
+      const dto = {
+        nome: f.nome,
+        serverUrl: f.serverUrl,
+        username: f.username,
+        codSistema: f.codSistema,
+        codColigada: f.codColigada,
+        ...(f.senha.trim() ? { senha: f.senha } : {}),
+      };
+      const fonteAtualizada = await atualizarFonteDeDados(accessToken, fonteId, dto);
+      update((s) => ({
+        wizardSaving: false,
+        moduloFontesDeDados: s.moduloFontesDeDados.map((fonte) => (fonte.id === fonteId ? fonteAtualizada : fonte)),
+        editingFonteId: null,
+        editFonteForm: { ...emptyEditFonteForm },
+      }));
+      showToast('Fonte de dados atualizada.');
+    } catch (err) {
+      update({ wizardSaving: false, wizardError: err instanceof Error ? err.message : 'Erro ao atualizar fonte de dados' });
+    }
+  };
 
   // --- Consultas reais ---
   const carregarConsultasDoModulo = async (moduloId: string) => {
@@ -943,7 +990,7 @@ export function useCorePilotState(accessToken: string) {
     const conversaId = state.moduloConversaId;
     const texto = state.moduloChatDraft.trim();
     if (!conversaId || !texto || state.moduloChatEnviando) return;
-    update({ moduloChatDraft: '', moduloChatEnviando: true, moduloChatErro: null });
+    update({ moduloChatDraft: '', moduloChatEnviando: true, moduloChatErro: null, moduloChatStatus: null });
 
     const idUsuario = 'local-' + Date.now();
     const idAgente = 'local-' + (Date.now() + 1);
@@ -957,12 +1004,16 @@ export function useCorePilotState(accessToken: string) {
 
     let respostaAcumulada = '';
     await enviarMensagemStreaming(accessToken, conversaId, texto, {
+      onStatus: (mensagem) => update({ moduloChatStatus: mensagem }),
       onDelta: (delta) => {
         respostaAcumulada += delta;
-        update((s) => ({ moduloMensagens: s.moduloMensagens.map((m) => (m.id === idAgente ? { ...m, conteudo: respostaAcumulada } : m)) }));
+        update((s) => ({
+          moduloChatStatus: null,
+          moduloMensagens: s.moduloMensagens.map((m) => (m.id === idAgente ? { ...m, conteudo: respostaAcumulada } : m)),
+        }));
       },
-      onDone: () => update({ moduloChatEnviando: false }),
-      onErro: (mensagem) => update({ moduloChatEnviando: false, moduloChatErro: mensagem }),
+      onDone: () => update({ moduloChatEnviando: false, moduloChatStatus: null }),
+      onErro: (mensagem) => update({ moduloChatEnviando: false, moduloChatErro: mensagem, moduloChatStatus: null }),
     });
   };
 
@@ -998,6 +1049,7 @@ export function useCorePilotState(accessToken: string) {
     carregarSkillsDoAgente, abrirNovaSkill, abrirEdicaoSkill, cancelarEdicaoSkill, updateSkillFormNome, updateSkillFormObjetivo,
     adicionarCampoSaida, atualizarCampoSaida, removerCampoSaida, toggleFerramentaSkill, salvarSkillReal,
     carregarFontesDeDados, toggleNovaFonteForm, updateNovaFonteField, salvarNovaFonteReal,
+    editarFonte, cancelarEdicaoFonte, updateEditFonteField, salvarEdicaoFonte,
     carregarConsultasDoModulo, toggleNovaConsultaForm, updateNovaConsultaField, adicionarParametroConsulta, atualizarParametroConsulta,
     adicionarCampoFiltroConsulta, atualizarCampoFiltroConsulta, salvarNovaConsultaReal, testarConsultaReal, toggleSincronizacaoConsultaReal,
     selecionarSkillParaTeste, updateSkillTestEntrada, executarTesteSkillReal,

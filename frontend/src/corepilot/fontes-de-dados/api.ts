@@ -29,3 +29,26 @@ export async function criarFonteDeDados(
   if (!response.ok) throw new Error(`Falha ao criar fonte de dados (status ${response.status})`);
   return (await response.json()) as FonteDeDados;
 }
+
+export interface AtualizarFonteDeDadosDto {
+  nome?: string;
+  serverUrl?: string;
+  username?: string;
+  senha?: string;
+  codSistema?: string;
+  codColigada?: string;
+}
+
+export async function atualizarFonteDeDados(
+  accessToken: string,
+  fonteDeDadosId: string,
+  dto: AtualizarFonteDeDadosDto,
+): Promise<FonteDeDados> {
+  const response = await apiFetch(`/fontes-de-dados/${fonteDeDadosId}`, accessToken, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(dto),
+  });
+  if (!response.ok) throw new Error(`Falha ao atualizar fonte de dados (status ${response.status})`);
+  return (await response.json()) as FonteDeDados;
+}

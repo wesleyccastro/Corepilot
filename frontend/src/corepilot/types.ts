@@ -334,6 +334,24 @@ export const emptyNovaFonteForm: NovaFonteForm = {
   codColigada: '',
 };
 
+export interface EditFonteForm {
+  nome: string;
+  serverUrl: string;
+  username: string;
+  senha: string;
+  codSistema: string;
+  codColigada: string;
+}
+
+export const emptyEditFonteForm: EditFonteForm = {
+  nome: '',
+  serverUrl: '',
+  username: '',
+  senha: '',
+  codSistema: '',
+  codColigada: '',
+};
+
 export interface ParametroConsultaForm {
   chave: string;
   valor: string;

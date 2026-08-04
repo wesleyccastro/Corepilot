@@ -50,6 +50,13 @@ export interface ParseStructuredFromHistoryParams {
   schema: z.ZodTypeAny;
 }
 
+export interface StreamReplyFromHistoryParams {
+  system: string;
+  messages: MensagemConversa[];
+  model: string;
+  maxTokens: number;
+}
+
 @Injectable()
 export class AnthropicService {
   constructor(@Inject(ANTHROPIC_CLIENT) private readonly client: Anthropic) {}
@@ -61,6 +68,15 @@ export class AnthropicService {
       system: params.system,
       messages: params.messages,
     });
+  }
+
+  streamReplyFromHistory(params: StreamReplyFromHistoryParams) {
+    return this.client.messages.stream({
+      model: params.model,
+      max_tokens: params.maxTokens,
+      system: params.system,
+      messages: params.messages,
+    } as Parameters<typeof this.client.messages.stream>[0]);
   }
 
   async parseStructured(params: ParseStructuredParams) {

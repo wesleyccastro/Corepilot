@@ -1,17 +1,42 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CorePilotState } from '../initialState';
 import type { CorePilotActions } from '../useCorePilotState';
 import { GearIcon, LayersIcon } from '../icons';
 import { colors } from '../styles';
 import type { Modulo } from '../modulos/types';
 import { ChatComposer } from '../components/chat/ChatComposer';
-import { MessageBubble } from '../components/chat/MessageBubble';
+import { MessageBubble, ThinkingBubble } from '../components/chat/MessageBubble';
 
 export function CustomModuleView({ module, state, actions }: { module: Modulo; state: CorePilotState; actions: CorePilotActions }) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     void actions.carregarConversaDoModulo(module.id);
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [module.id]);
+
+  const ultimaMensagem = state.moduloMensagens[state.moduloMensagens.length - 1];
+  const aguardandoPrimeiroToken =
+    state.moduloChatEnviando && ultimaMensagem?.papel === 'agente' && ultimaMensagem.conteudo === '';
+  const mensagensVisiveis = aguardandoPrimeiroToken ? state.moduloMensagens.slice(0, -1) : state.moduloMensagens;
+
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [state.moduloMensagens, aguardandoPrimeiroToken]);
+
+  const [segundosDecorridos, setSegundosDecorridos] = useState(0);
+  useEffect(() => {
+    if (!aguardandoPrimeiroToken) {
+      setSegundosDecorridos(0);
+      return;
+    }
+    const inicio = Date.now();
+    const intervalo = window.setInterval(() => setSegundosDecorridos(Math.floor((Date.now() - inicio) / 1000)), 1000);
+    return () => window.clearInterval(intervalo);
+  }, [aguardandoPrimeiroToken]);
+
+  const rotuloEspera = state.moduloChatStatus ?? `${module.nome} está pensando…`;
+  const rotuloComTempo = segundosDecorridos >= 8 ? `${rotuloEspera} (${segundosDecorridos}s)` : rotuloEspera;
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '48px 24px 24px', position: 'relative', display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -33,13 +58,24 @@ export function CustomModuleView({ module, state, actions }: { module: Modulo; s
       {state.moduloChatErro && <div style={{ color: colors.danger, fontSize: 13, marginBottom: 12, flexShrink: 0 }}>{state.moduloChatErro}</div>}
 
       <div style={{ flex: 1, overflowY: 'auto', marginBottom: 16 }}>
-        {state.moduloMensagens.map((mensagem) => (
+        {mensagensVisiveis.map((mensagem) => (
           <MessageBubble
             key={mensagem.id}
             msg={{ id: 0, isUser: mensagem.papel === 'usuario', isAi: mensagem.papel === 'agente', text: mensagem.conteudo }}
             agentLabel={module.nome}
           />
         ))}
+        {aguardandoPrimeiroToken && (
+          <>
+            <ThinkingBubble label={rotuloComTempo} />
+            {segundosDecorridos >= 20 && (
+              <div style={{ fontSize: 11.5, color: colors.textFaint, margin: '6px 0 0 38px' }}>
+                Perguntas que cruzam muitos dados podem levar até 1 minuto.
+              </div>
+            )}
+          </>
+        )}
+        <div ref={scrollRef} />
       </div>
 
       <div style={{ flexShrink: 0 }}>
@@ -57,6 +93,7 @@ export function CustomModuleView({ module, state, actions }: { module: Modulo; s
           onSend={() => void actions.enviarMensagemModuloReal()}
           attachments={[]}
           onAttach={() => {}}
+          disabled={state.moduloChatEnviando}
         />
       </div>
     </div>

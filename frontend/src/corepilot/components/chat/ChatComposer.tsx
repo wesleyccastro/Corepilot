@@ -12,9 +12,10 @@ interface ChatComposerProps {
   onSend: () => void;
   attachments: (Attachment & { onRemove: () => void })[];
   onAttach: (e: ChangeEvent<HTMLInputElement>) => void;
+  disabled?: boolean;
 }
 
-export function ChatComposer({ variant, placeholder, value, onChange, onKeyDown, onSend, attachments, onAttach }: ChatComposerProps) {
+export function ChatComposer({ variant, placeholder, value, onChange, onKeyDown, onSend, attachments, onAttach, disabled }: ChatComposerProps) {
   const isOverview = variant === 'overview';
   return (
     <div>
@@ -65,11 +66,15 @@ export function ChatComposer({ variant, placeholder, value, onChange, onKeyDown,
           <PaperclipIcon />
         </label>
         {isOverview ? (
-          <button onClick={onSend} style={{ background: colors.navy, color: '#fff', border: 'none', borderRadius: 10, width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, marginBottom: 5 }}>
+          <button
+            onClick={onSend}
+            disabled={disabled}
+            style={{ background: disabled ? colors.chipBg : colors.navy, color: '#fff', border: 'none', borderRadius: 10, width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: disabled ? 'not-allowed' : 'pointer', flexShrink: 0, marginBottom: 5 }}
+          >
             <SendIcon />
           </button>
         ) : (
-          <span onClick={onSend} style={{ cursor: 'pointer', flexShrink: 0, marginBottom: 2 }}>
+          <span onClick={disabled ? undefined : onSend} style={{ cursor: disabled ? 'not-allowed' : 'pointer', flexShrink: 0, marginBottom: 2, opacity: disabled ? 0.4 : 1 }}>
             <SendIcon size={18} color={colors.teal} />
           </span>
         )}

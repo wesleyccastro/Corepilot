@@ -21,6 +21,7 @@ export async function listarMensagens(accessToken: string, conversaId: string): 
 
 export interface EnviarMensagemHandlers {
   onDelta: (texto: string) => void;
+  onStatus?: (mensagem: string) => void;
   onDone: (info: { mensagemId: string; tokensEntrada: number; tokensSaida: number }) => void;
   onErro: (mensagem: string) => void;
 }
@@ -59,10 +60,12 @@ export async function enviarMensagemStreaming(
 
       const evento = JSON.parse(linha) as
         | { type: 'delta'; text: string }
+        | { type: 'status'; mensagem: string }
         | { type: 'done'; mensagemId: string; tokensEntrada: number; tokensSaida: number }
         | { type: 'erro'; mensagem: string };
 
       if (evento.type === 'delta') handlers.onDelta(evento.text);
+      else if (evento.type === 'status') handlers.onStatus?.(evento.mensagem);
       else if (evento.type === 'done') handlers.onDone(evento);
       else handlers.onErro(evento.mensagem);
     }

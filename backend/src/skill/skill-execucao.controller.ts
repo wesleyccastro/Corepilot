@@ -8,7 +8,11 @@ import { SkillExecucaoService } from './skill-execucao.service';
 import { AnthropicService, type MensagemConversa } from '../chat/anthropic.service';
 import { AuditService } from '../audit/audit.service';
 import { construirSchemaSaida, type CampoSaida } from './schema-builder';
-import { construirInputSchemaFerramenta } from '../consulta/tool-schema-builder';
+import {
+  buscarDadosLocaisConsulta,
+  consultaIdDaFerramenta,
+  montarFerramentasDeConsultas,
+} from '../consulta/consulta-ferramenta.util';
 import type { ExecutarSkillDto } from './dto/executar-skill.dto';
 
 function montarSystemPrompt(
@@ -20,14 +24,6 @@ function montarSystemPrompt(
     `Objetivo do agente: ${agente.objetivo}`,
     `Você está executando a skill com o seguinte objetivo: ${skill.objetivo}`,
   ].join('\n\n');
-}
-
-function nomeFerramenta(consultaId: string): string {
-  return `consulta_${consultaId}`;
-}
-
-function consultaIdDaFerramenta(nome: string): string {
-  return nome.replace('consulta_', '');
 }
 
 const MAX_ITERACOES_TOOL_USE = 5;
@@ -116,11 +112,7 @@ export class SkillExecucaoController {
     entrada: string,
     schema: ReturnType<typeof construirSchemaSaida>,
   ) {
-    const tools = skill.ferramentas.map((ferramenta) => ({
-      name: nomeFerramenta(ferramenta.id),
-      description: `Consulta "${ferramenta.nome}" com dados sincronizados do TOTVS RM.`,
-      input_schema: construirInputSchemaFerramenta(ferramenta.camposFiltro as unknown as CampoSaida[]),
-    }));
+    const tools = montarFerramentasDeConsultas(skill.ferramentas);
 
     let mensagens: MensagemConversa[] = [{ role: 'user', content: entrada }];
 
@@ -144,7 +136,7 @@ export class SkillExecucaoController {
       const resultadosDeTool = await Promise.all(
         blocosDeTool.map(async (bloco) => {
           const consultaId = consultaIdDaFerramenta(bloco.name as string);
-          const linhas = await this.buscarDadosLocais(consultaId, bloco.input as Record<string, unknown>);
+          const linhas = await buscarDadosLocaisConsulta(this.prisma, consultaId, bloco.input as Record<string, unknown>);
           return {
             type: 'tool_result',
             tool_use_id: bloco.id as string,
@@ -163,20 +155,5 @@ export class SkillExecucaoController {
       maxTokens: 4096,
       schema,
     });
-  }
-
-  private async buscarDadosLocais(
-    consultaId: string,
-    filtro: Record<string, unknown>,
-  ): Promise<Record<string, unknown>[]> {
-    const linhas = await this.prisma.consultaResultado.findMany({
-      where: { consultaParametrizadaId: consultaId },
-      take: 200,
-    });
-
-    const dados = linhas.map((linha) => linha.dados as Record<string, unknown>);
-    const chavesFiltro = Object.entries(filtro);
-
-    return dados.filter((linha) => chavesFiltro.every(([chave, valor]) => linha[chave] === valor)).slice(0, 20);
   }
 }

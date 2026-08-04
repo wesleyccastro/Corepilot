@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { criptografar } from './crypto';
 import type { CreateFonteDeDadosDto } from './dto/create-fonte-de-dados.dto';
+import type { UpdateFonteDeDadosDto } from './dto/update-fonte-de-dados.dto';
 
 export interface ConfiguracaoFonteDeDados {
   serverUrl: string;
@@ -57,5 +58,31 @@ export class FonteDeDadosService {
     }
 
     return fonte;
+  }
+
+  async update(fonteDeDadosId: string, empresaId: string, dto: UpdateFonteDeDadosDto) {
+    const fonte = await this.findByIdInEmpresa(fonteDeDadosId, empresaId);
+    const configuracaoAtual = fonte.configuracao as unknown as ConfiguracaoFonteDeDados;
+
+    const configuracao: ConfiguracaoFonteDeDados = {
+      serverUrl: dto.serverUrl ?? configuracaoAtual.serverUrl,
+      username: dto.username ?? configuracaoAtual.username,
+      senhaCriptografada: dto.senha
+        ? criptografar(dto.senha, this.config.getOrThrow<string>('ERP_ENCRYPTION_KEY'))
+        : configuracaoAtual.senhaCriptografada,
+      codSistema: dto.codSistema ?? configuracaoAtual.codSistema,
+      codColigada: dto.codColigada ?? configuracaoAtual.codColigada,
+    };
+
+    return this.prisma.fonteDeDados.update({
+      where: { id: fonteDeDadosId },
+      data: {
+        nome: dto.nome ?? fonte.nome,
+        configuracao: configuracao as unknown as Prisma.InputJsonValue,
+        ultimoTesteEm: null,
+        ultimoTesteSucesso: null,
+        ultimaMensagemErro: null,
+      },
+    });
   }
 }

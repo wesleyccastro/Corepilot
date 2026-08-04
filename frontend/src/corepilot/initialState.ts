@@ -30,9 +30,11 @@ import type { FonteDeDados } from './fontes-de-dados/types';
 import type { Consulta, ResultadoTeste } from './consultas/types';
 import type { Mensagem, Modulo } from './modulos/types';
 import {
+  emptyEditFonteForm,
   emptyNovaConsultaForm,
   emptyNovaFonteForm,
   emptyNovoAgenteForm,
+  type EditFonteForm,
   type NovaConsultaForm,
   type NovaFonteForm,
   type NovoAgenteForm,
@@ -174,6 +176,8 @@ export interface CorePilotState {
   fontesLoading: boolean;
   novaFonteForm: NovaFonteForm;
   showNovaFonteForm: boolean;
+  editingFonteId: string | null;
+  editFonteForm: EditFonteForm;
 
   moduloConsultas: Consulta[];
   consultasLoading: boolean;
@@ -193,6 +197,7 @@ export interface CorePilotState {
   moduloChatDraft: string;
   moduloChatEnviando: boolean;
   moduloChatErro: string | null;
+  moduloChatStatus: string | null;
 }
 
 export function createInitialState(): CorePilotState {
@@ -421,6 +426,8 @@ export function createInitialState(): CorePilotState {
     fontesLoading: false,
     novaFonteForm: { ...emptyNovaFonteForm },
     showNovaFonteForm: false,
+    editingFonteId: null,
+    editFonteForm: { ...emptyEditFonteForm },
 
     moduloConsultas: [],
     consultasLoading: false,
@@ -440,5 +447,6 @@ export function createInitialState(): CorePilotState {
     moduloChatDraft: '',
     moduloChatEnviando: false,
     moduloChatErro: null,
+    moduloChatStatus: null,
   };
 }

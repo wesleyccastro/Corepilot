@@ -107,4 +107,28 @@ describe('AnthropicService', () => {
     );
     expect(resultado).toBe(respostaFalsa);
   });
+
+  it('streamReplyFromHistory chama client.messages.stream com o histórico completo', () => {
+    const streamFalso = { fake: 'stream' };
+    const client = {
+      messages: { stream: jest.fn().mockReturnValue(streamFalso) },
+    } as unknown as Anthropic;
+    const service = new AnthropicService(client);
+    const historico = [
+      { role: 'user' as const, content: 'oi' },
+      { role: 'assistant' as const, content: [{ type: 'text', text: 'ok' }] },
+    ];
+
+    const resultado = service.streamReplyFromHistory({
+      system: 'sys',
+      messages: historico,
+      model: 'claude-sonnet-5',
+      maxTokens: 4096,
+    });
+
+    expect(client.messages.stream).toHaveBeenCalledWith(
+      expect.objectContaining({ system: 'sys', messages: historico }),
+    );
+    expect(resultado).toBe(streamFalso);
+  });
 });

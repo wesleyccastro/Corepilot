@@ -6,9 +6,10 @@ import { anthropicClientProvider } from './anthropic-client.provider';
 import { AuthModule } from '../auth/auth.module';
 import { AuditModule } from '../audit/audit.module';
 import { ConversaModule } from '../conversa/conversa.module';
+import { ConsultaModule } from '../consulta/consulta.module';
 
 @Module({
-  imports: [AuthModule, AuditModule, ConversaModule],
+  imports: [AuthModule, AuditModule, ConversaModule, ConsultaModule],
   controllers: [MensagemController],
   providers: [MensagemService, AnthropicService, anthropicClientProvider],
   exports: [AnthropicService],
