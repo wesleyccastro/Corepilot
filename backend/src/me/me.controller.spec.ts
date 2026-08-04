@@ -2,6 +2,7 @@ import { MeController } from './me.controller';
 import type { TenantContext } from '../auth/tenant-context';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { AuditService } from '../audit/audit.service';
+import { EmpresaService } from '../empresa/empresa.service';
 
 describe('MeController', () => {
   it('retorna usuário, empresa e perfil, e grava auditoria', async () => {
@@ -24,7 +25,7 @@ describe('MeController', () => {
       empresa: {
         findUniqueOrThrow: jest
           .fn()
-          .mockResolvedValue({ id: 'empresa-1', nome: 'Empresa A' }),
+          .mockResolvedValue({ id: 'empresa-1', nome: 'Empresa A', razaoSocial: null }),
       },
     } as unknown as PrismaService;
 
@@ -34,13 +35,19 @@ describe('MeController', () => {
     const record = jest.fn().mockResolvedValue(undefined);
     const audit = { record } as unknown as AuditService;
 
-    const controller = new MeController(tenantContext, prisma, audit);
+    const empresaService = new EmpresaService({} as PrismaService);
+    const controller = new MeController(
+      tenantContext,
+      prisma,
+      audit,
+      empresaService,
+    );
 
     const resultado = await controller.getMe();
 
     expect(resultado).toEqual({
       usuario: { id: 'usuario-1', nome: 'Ana', email: 'ana@empresa-a.com' },
-      empresa: { id: 'empresa-1', nome: 'Empresa A' },
+      empresa: { id: 'empresa-1', nome: 'Empresa A', razaoSocial: null, logoDataUrl: null },
       perfil: 'admin',
     });
     expect(record).toHaveBeenCalledWith(

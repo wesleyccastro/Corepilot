@@ -1,8 +1,9 @@
 import type { CorePilotState } from '../initialState';
 import type { CorePilotActions } from '../useCorePilotState';
 import type { MeResponse } from '../useMe';
-import { BellIcon, BuildingIcon, ChevronDownIcon, CorePilotLogoIcon, GearIcon, LayersIcon, LogoutIcon, PlusIcon, SearchIcon, UsersIcon } from '../icons';
+import { BellIcon, BuildingIcon, ChevronDownIcon, GearIcon, LayersIcon, LogoutIcon, PlusIcon, SearchIcon, UsersIcon } from '../icons';
 import { colors, overlayFixed } from '../styles';
+import logo from '../../assets/logo.png';
 
 interface HeaderProps {
   state: CorePilotState;
@@ -29,12 +30,15 @@ export function Header({ state, actions, me }: HeaderProps) {
   return (
     <div style={{ flexShrink: 0 }}>
       <div style={{ background: colors.navy, color: '#fff', display: 'flex', alignItems: 'center', gap: 20, padding: '0 24px', height: 60 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <CorePilotLogoIcon />
-          <span style={{ fontWeight: 800, fontSize: 17, letterSpacing: '.2px' }}>CorePilot</span>
+        <div style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: 8, padding: '4px 10px' }}>
+          <img src={logo} alt="CorePilot" style={{ height: 32, display: 'block' }} />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,.06)', borderRadius: 8, padding: '5px 12px 5px 5px' }}>
-          <div style={{ width: 26, height: 26, flexShrink: 0, borderRadius: 6, background: 'rgba(255,255,255,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800 }}>{iniciais(nomeEmpresa)}</div>
+          {me?.empresa.logoDataUrl ? (
+            <img src={me.empresa.logoDataUrl} alt="" style={{ width: 26, height: 26, flexShrink: 0, borderRadius: 6, objectFit: 'contain', background: '#fff' }} />
+          ) : (
+            <div style={{ width: 26, height: 26, flexShrink: 0, borderRadius: 6, background: 'rgba(255,255,255,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800 }}>{iniciais(nomeEmpresa)}</div>
+          )}
           <span style={{ fontSize: 13.5, fontWeight: 700, letterSpacing: '.1px' }}>{nomeEmpresa}</span>
         </div>
         <div style={{ flex: 1, maxWidth: 460, display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,.08)', borderRadius: 8, padding: '8px 12px' }}>

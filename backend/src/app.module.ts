@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { MeModule } from './me/me.module';
+import { EmpresaModule } from './empresa/empresa.module';
 import { ModuloModule } from './modulo/modulo.module';
 import { ConversaModule } from './conversa/conversa.module';
 import { ChatModule } from './chat/chat.module';
@@ -21,6 +22,7 @@ import { FerramentaModule } from './skill/ferramenta.module';
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env.local' }),
     PrismaModule,
     MeModule,
+    EmpresaModule,
     ModuloModule,
     ConversaModule,
     ChatModule,

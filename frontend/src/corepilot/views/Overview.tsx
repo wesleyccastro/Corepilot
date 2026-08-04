@@ -4,20 +4,26 @@ import { ChatComposer } from '../components/chat/ChatComposer';
 import { MessageBubble, ThinkingBubble } from '../components/chat/MessageBubble';
 import { overviewQnA } from '../seedData';
 import { colors } from '../styles';
+import type { MeResponse } from '../useMe';
 import type { MutableRefObject } from 'react';
 
 interface OverviewProps {
   state: CorePilotState;
   actions: CorePilotActions;
   scrollRef: MutableRefObject<HTMLDivElement | null>;
+  me: MeResponse | null;
 }
 
-export function Overview({ state, actions, scrollRef }: OverviewProps) {
+export function Overview({ state, actions, scrollRef, me }: OverviewProps) {
   return (
     <div style={{ padding: '24px 24px 20px', height: '100%', display: 'flex', gap: 24 }}>
       <div style={{ width: 260, flexShrink: 0 }}>
-        <div style={{ width: '100%', height: 140, borderRadius: 14, background: '#EAF1EF', border: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, color: colors.textFaint, fontWeight: 600 }}>
-          Logo da empresa
+        <div style={{ width: '100%', height: 140, borderRadius: 14, background: '#EAF1EF', border: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, color: colors.textFaint, fontWeight: 600, overflow: 'hidden' }}>
+          {me?.empresa.logoDataUrl ? (
+            <img src={me.empresa.logoDataUrl} alt={me.empresa.nome} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+          ) : (
+            'Logo da empresa'
+          )}
         </div>
       </div>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', maxWidth: 1080 }}>

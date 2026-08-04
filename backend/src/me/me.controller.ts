@@ -4,6 +4,7 @@ import { TenantGuard } from '../auth/tenant.guard';
 import { TenantContext } from '../auth/tenant-context';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { EmpresaService } from '../empresa/empresa.service';
 
 @Controller('me')
 @UseGuards(JwtAuthGuard, TenantGuard)
@@ -12,6 +13,7 @@ export class MeController {
     private readonly tenantContext: TenantContext,
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly empresaService: EmpresaService,
   ) {}
 
   @Get()
@@ -34,7 +36,7 @@ export class MeController {
 
     return {
       usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email },
-      empresa: { id: empresa.id, nome: empresa.nome },
+      empresa: this.empresaService.toEmpresaResumo(empresa),
       perfil,
     };
   }

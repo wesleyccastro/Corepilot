@@ -8,9 +8,12 @@ datasource db {
 }
 
 model Empresa {
-  id       String   @id @default(uuid())
-  nome     String
-  criadoEm DateTime @default(now())
+  id              String   @id @default(uuid())
+  nome            String
+  razaoSocial     String?
+  logoData        Bytes?
+  logoContentType String?
+  criadoEm        DateTime @default(now())
 
   usuarios      UsuarioEmpresa[]
   auditLogs     AuditLog[]
