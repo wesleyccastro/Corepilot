@@ -1037,9 +1037,13 @@ export function useCorePilotState(accessToken: string) {
     update({ moduloConversaId: conversaId, moduloMensagens: [], moduloChatErro: null });
     try {
       const mensagens = await listarMensagens(accessToken, conversaId);
-      update({ moduloMensagens: mensagens });
+      update((s) => (s.moduloConversaId === conversaId ? { moduloMensagens: mensagens } : null));
     } catch (err) {
-      update({ moduloChatErro: err instanceof Error ? err.message : 'Erro ao carregar mensagens' });
+      update((s) =>
+        s.moduloConversaId === conversaId
+          ? { moduloChatErro: err instanceof Error ? err.message : 'Erro ao carregar mensagens' }
+          : null,
+      );
     }
   };
 
