@@ -10,6 +10,11 @@ describe('ConversaService', () => {
         create: jest.fn(),
         findMany: jest.fn(),
         findFirst: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn(),
+      },
+      mensagem: {
+        deleteMany: jest.fn(),
       },
     } as unknown as PrismaService;
     const moduloService = {
@@ -78,5 +83,56 @@ describe('ConversaService', () => {
     const resultado = await service.findOwned('conversa-1', 'usuario-1');
 
     expect(resultado).toBe(conversaComModulo);
+  });
+
+  it('update atualiza a conversa depois de confirmar posse', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.conversa.findFirst as jest.Mock).mockResolvedValue({ id: 'conversa-1', usuarioId: 'usuario-1' });
+    (prisma.conversa.update as jest.Mock).mockResolvedValue({ id: 'conversa-1', arquivada: true });
+    const service = new ConversaService(prisma, moduloService);
+
+    const resultado = await service.update('conversa-1', 'usuario-1', { arquivada: true });
+
+    expect(prisma.conversa.findFirst).toHaveBeenCalledWith({
+      where: { id: 'conversa-1', usuarioId: 'usuario-1' },
+      include: { modulo: true },
+    });
+    expect(prisma.conversa.update).toHaveBeenCalledWith({
+      where: { id: 'conversa-1' },
+      data: { titulo: undefined, arquivada: true, fixada: undefined, tagId: undefined },
+    });
+    expect(resultado).toEqual({ id: 'conversa-1', arquivada: true });
+  });
+
+  it('update lança NotFoundException se a conversa não for do usuário', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.conversa.findFirst as jest.Mock).mockResolvedValue(null);
+    const service = new ConversaService(prisma, moduloService);
+
+    await expect(service.update('conversa-x', 'usuario-1', { arquivada: true })).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(prisma.conversa.update).not.toHaveBeenCalled();
+  });
+
+  it('remove apaga as mensagens e depois a conversa, após confirmar posse', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.conversa.findFirst as jest.Mock).mockResolvedValue({ id: 'conversa-1', usuarioId: 'usuario-1' });
+    const service = new ConversaService(prisma, moduloService);
+
+    await service.remove('conversa-1', 'usuario-1');
+
+    expect(prisma.mensagem.deleteMany).toHaveBeenCalledWith({ where: { conversaId: 'conversa-1' } });
+    expect(prisma.conversa.delete).toHaveBeenCalledWith({ where: { id: 'conversa-1' } });
+  });
+
+  it('remove lança NotFoundException se a conversa não for do usuário (não apaga nada)', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.conversa.findFirst as jest.Mock).mockResolvedValue(null);
+    const service = new ConversaService(prisma, moduloService);
+
+    await expect(service.remove('conversa-x', 'usuario-1')).rejects.toThrow(NotFoundException);
+    expect(prisma.mensagem.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.conversa.delete).not.toHaveBeenCalled();
   });
 });
