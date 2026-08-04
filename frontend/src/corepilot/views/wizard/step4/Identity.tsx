@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { CorePilotState } from '../../../initialState';
 import type { CorePilotActions } from '../../../useCorePilotState';
-import { colors, input, label } from '../../../styles';
+import { btnDark, colors, input, label } from '../../../styles';
 import { GerarRascunhoButton } from '../../../components/GerarRascunhoButton';
 
 export function AgentIdentityTab({ state, actions }: { state: CorePilotState; actions: CorePilotActions }) {
@@ -22,6 +22,13 @@ export function AgentIdentityTab({ state, actions }: { state: CorePilotState; ac
   }, [agente?.id]);
 
   if (!agente) return null;
+
+  const alterado =
+    nome !== agente.nome ||
+    funcao !== agente.funcao ||
+    objetivo !== agente.objetivo ||
+    guardrails !== (agente.guardrails ?? '') ||
+    regraEscalonamento !== (agente.regraEscalonamento ?? '');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 560 }}>
@@ -93,6 +100,20 @@ export function AgentIdentityTab({ state, actions }: { state: CorePilotState; ac
           <div style={{ fontSize: 10.5, color: colors.teal, fontWeight: 700 }}>Único suportado nesta versão</div>
         </div>
         <div style={{ fontSize: 12, color: colors.textFaint, marginTop: 8 }}>O CorePilot é otimizado e roda exclusivamente com Claude.</div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button
+          onClick={() => void actions.salvarIdentidadeAgenteReal({ nome, funcao, objetivo, guardrails, regraEscalonamento })}
+          disabled={state.wizardSaving || !alterado}
+          style={{ ...btnDark, opacity: state.wizardSaving || !alterado ? 0.6 : 1 }}
+        >
+          {state.wizardSaving ? 'Salvando…' : 'Salvar'}
+        </button>
+        {alterado && !state.wizardSaving && (
+          <span style={{ fontSize: 12, color: colors.warnText, fontWeight: 600 }}>
+            Alterações não salvas — mudar de aba ou de agente descarta o que não foi salvo.
+          </span>
+        )}
       </div>
     </div>
   );

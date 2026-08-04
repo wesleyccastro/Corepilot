@@ -789,6 +789,24 @@ export function useCorePilotState(accessToken: string) {
       update({ wizardError: err instanceof Error ? err.message : 'Erro ao atualizar agente' });
     }
   };
+  const salvarIdentidadeAgenteReal = async (dados: {
+    nome: string;
+    funcao: string;
+    objetivo: string;
+    guardrails: string;
+    regraEscalonamento: string;
+  }) => {
+    const moduloId = state.currentModuloId;
+    const agenteId = state.selectedAgenteId;
+    if (!moduloId || !agenteId) return;
+    update({ wizardSaving: true, wizardError: null });
+    try {
+      const agente = await atualizarAgente(accessToken, moduloId, agenteId, dados);
+      update((s) => ({ wizardSaving: false, moduloAgentes: s.moduloAgentes.map((a) => (a.id === agenteId ? agente : a)) }));
+    } catch (err) {
+      update({ wizardSaving: false, wizardError: err instanceof Error ? err.message : 'Erro ao salvar agente' });
+    }
+  };
   const gerarRascunhoInstrucoesModulo = async (brief: string) => {
     const moduloId = state.currentModuloId;
     if (!moduloId) return;
@@ -1299,6 +1317,7 @@ export function useCorePilotState(accessToken: string) {
     chatListKeyFor,
 
     carregarAgentesDoModulo, selecionarAgente, toggleNovoAgenteForm, updateNovoAgenteField, criarNovoAgenteReal, atualizarAgenteReal,
+    salvarIdentidadeAgenteReal,
     gerarRascunhoInstrucoesModulo, gerarRascunhoGuardrailsAgente, gerarRascunhoSkill,
     carregarSkillsDoAgente, abrirNovaSkill, abrirEdicaoSkill, cancelarEdicaoSkill, updateSkillFormNome, updateSkillFormObjetivo,
     adicionarCampoSaida, atualizarCampoSaida, removerCampoSaida, toggleFerramentaSkill, salvarSkillReal,
