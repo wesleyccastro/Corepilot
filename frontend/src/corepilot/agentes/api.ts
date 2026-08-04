@@ -107,6 +107,8 @@ export interface AtualizarAgenteDto {
   nome?: string;
   funcao?: string;
   objetivo?: string;
+  guardrails?: string;
+  regraEscalonamento?: string;
 }
 
 export async function atualizarAgente(

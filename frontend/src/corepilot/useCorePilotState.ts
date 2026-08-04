@@ -776,7 +776,7 @@ export function useCorePilotState(accessToken: string) {
       update({ wizardSaving: false, wizardError: err instanceof Error ? err.message : 'Erro ao criar agente' });
     }
   };
-  const atualizarAgenteReal = async (campo: 'nome' | 'funcao' | 'objetivo', valor: string) => {
+  const atualizarAgenteReal = async (campo: 'nome' | 'funcao' | 'objetivo' | 'guardrails' | 'regraEscalonamento', valor: string) => {
     const moduloId = state.currentModuloId;
     const agenteId = state.selectedAgenteId;
     if (!moduloId || !agenteId) return;

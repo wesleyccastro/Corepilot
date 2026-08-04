@@ -108,6 +108,39 @@ describe('SkillExecucaoController', () => {
     });
   });
 
+  it('inclui guardrails e regra de escalonamento no system prompt quando preenchidos no agente', async () => {
+    const { skillService, skillExecucaoService, anthropicService, audit } = buildDeps();
+    (skillService.findByIdInEmpresa as jest.Mock).mockResolvedValue({
+      ...skillComAgente,
+      agente: {
+        ...skillComAgente.agente,
+        guardrails: 'Nunca aprove uma compra sozinho.',
+        regraEscalonamento: 'Se o valor exceder R$ 50 mil, escale para o gestor.',
+      },
+    });
+    const controller = new SkillExecucaoController(
+      skillService,
+      skillExecucaoService,
+      anthropicService,
+      audit,
+      buildPrismaVazio(),
+      buildTenantContext(),
+    );
+
+    await controller.executar('skill-1', { entrada: 'Pedido: 10 parafusos' });
+
+    expect(anthropicService.parseStructured).toHaveBeenCalledWith(
+      expect.objectContaining({
+        system: expect.stringContaining('Nunca aprove uma compra sozinho.'),
+      }),
+    );
+    expect(anthropicService.parseStructured).toHaveBeenCalledWith(
+      expect.objectContaining({
+        system: expect.stringContaining('Se o valor exceder R$ 50 mil, escale para o gestor.'),
+      }),
+    );
+  });
+
   it('lança erro e não persiste quando a saída não bate com o schema (parsed_output nulo)', async () => {
     const { skillService, skillExecucaoService, anthropicService, audit } = buildDeps();
     (anthropicService.parseStructured as jest.Mock).mockResolvedValue({

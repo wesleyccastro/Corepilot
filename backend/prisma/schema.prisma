@@ -137,14 +137,16 @@ model Mensagem {
 }
 
 model Agente {
-  id        String   @id @default(uuid())
-  empresaId String
-  moduloId  String
-  nome      String
-  funcao    String
-  objetivo  String
-  modeloIA  String   @default("claude-sonnet-5")
-  criadoEm  DateTime @default(now())
+  id                String   @id @default(uuid())
+  empresaId         String
+  moduloId          String
+  nome              String
+  funcao            String
+  objetivo          String
+  guardrails        String?
+  regraEscalonamento String?
+  modeloIA          String   @default("claude-sonnet-5")
+  criadoEm          DateTime @default(now())
 
   empresa Empresa @relation(fields: [empresaId], references: [id])
   modulo  Modulo  @relation(fields: [moduloId], references: [id])

@@ -21,6 +21,8 @@ export class AgenteService {
         nome: dto.nome,
         funcao: dto.funcao,
         objetivo: dto.objetivo,
+        guardrails: dto.guardrails,
+        regraEscalonamento: dto.regraEscalonamento,
         modeloIA: dto.modeloIA,
       },
     });
@@ -56,6 +58,8 @@ export class AgenteService {
         nome: dto.nome,
         funcao: dto.funcao,
         objetivo: dto.objetivo,
+        guardrails: dto.guardrails,
+        regraEscalonamento: dto.regraEscalonamento,
       },
     });
   }

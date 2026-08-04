@@ -4,6 +4,8 @@ export interface Agente {
   nome: string;
   funcao: string;
   objetivo: string;
+  guardrails: string | null;
+  regraEscalonamento: string | null;
   modeloIA: string;
   criadoEm: string;
 }

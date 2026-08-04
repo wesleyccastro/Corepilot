@@ -16,14 +16,29 @@ import {
 import type { ExecutarSkillDto } from './dto/executar-skill.dto';
 
 function montarSystemPrompt(
-  agente: { nome: string; funcao: string; objetivo: string },
+  agente: {
+    nome: string;
+    funcao: string;
+    objetivo: string;
+    guardrails: string | null;
+    regraEscalonamento: string | null;
+  },
   skill: { objetivo: string },
 ): string {
-  return [
+  const partes = [
     `Você é o agente "${agente.nome}" (${agente.funcao}) desta empresa.`,
     `Objetivo do agente: ${agente.objetivo}`,
     `Você está executando a skill com o seguinte objetivo: ${skill.objetivo}`,
-  ].join('\n\n');
+  ];
+
+  if (agente.guardrails?.trim()) {
+    partes.push(`RESTRIÇÕES (nunca viole):\n${agente.guardrails.trim()}`);
+  }
+  if (agente.regraEscalonamento?.trim()) {
+    partes.push(`ESCALONAMENTO PARA HUMANO:\n${agente.regraEscalonamento.trim()}`);
+  }
+
+  return partes.join('\n\n');
 }
 
 const MAX_ITERACOES_TOOL_USE = 5;

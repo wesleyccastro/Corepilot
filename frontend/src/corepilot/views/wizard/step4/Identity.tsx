@@ -8,11 +8,15 @@ export function AgentIdentityTab({ state, actions }: { state: CorePilotState; ac
   const [nome, setNome] = useState(agente?.nome ?? '');
   const [funcao, setFuncao] = useState(agente?.funcao ?? '');
   const [objetivo, setObjetivo] = useState(agente?.objetivo ?? '');
+  const [guardrails, setGuardrails] = useState(agente?.guardrails ?? '');
+  const [regraEscalonamento, setRegraEscalonamento] = useState(agente?.regraEscalonamento ?? '');
 
   useEffect(() => {
     setNome(agente?.nome ?? '');
     setFuncao(agente?.funcao ?? '');
     setObjetivo(agente?.objetivo ?? '');
+    setGuardrails(agente?.guardrails ?? '');
+    setRegraEscalonamento(agente?.regraEscalonamento ?? '');
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [agente?.id]);
 
@@ -47,6 +51,28 @@ export function AgentIdentityTab({ state, actions }: { state: CorePilotState; ac
           value={objetivo}
           onChange={(e) => setObjetivo(e.target.value)}
           onBlur={() => objetivo !== agente.objetivo && void actions.atualizarAgenteReal('objetivo', objetivo)}
+          style={{ ...input, width: '100%', resize: 'vertical' }}
+        />
+      </div>
+      <div>
+        <label style={label}>Restrições (o que este agente NUNCA deve fazer)</label>
+        <textarea
+          rows={3}
+          value={guardrails}
+          onChange={(e) => setGuardrails(e.target.value)}
+          onBlur={() => guardrails !== (agente.guardrails ?? '') && void actions.atualizarAgenteReal('guardrails', guardrails)}
+          placeholder="Ex.: nunca aprovar ou fechar uma compra sozinho; nunca inventar preço sem fonte."
+          style={{ ...input, width: '100%', resize: 'vertical' }}
+        />
+      </div>
+      <div>
+        <label style={label}>Quando escalar para um humano</label>
+        <textarea
+          rows={3}
+          value={regraEscalonamento}
+          onChange={(e) => setRegraEscalonamento(e.target.value)}
+          onBlur={() => regraEscalonamento !== (agente.regraEscalonamento ?? '') && void actions.atualizarAgenteReal('regraEscalonamento', regraEscalonamento)}
+          placeholder="Ex.: se não encontrar 3 fornecedores confiáveis, ou se o preço variar mais de 40% entre fontes."
           style={{ ...input, width: '100%', resize: 'vertical' }}
         />
       </div>
