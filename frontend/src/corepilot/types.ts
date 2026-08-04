@@ -6,7 +6,16 @@ export type ViewId =
   | 'admin-users'
   | 'admin-settings'
   | 'admin-company'
+  | 'admin-modulos'
   | `module:${string}`;
+
+export interface ConfirmDialogState {
+  titulo: string;
+  mensagem: string;
+  confirmarLabel?: string;
+  perigo?: boolean;
+  onConfirmar: () => void;
+}
 
 export interface ChatMessage {
   id: number;

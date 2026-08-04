@@ -12,8 +12,8 @@ export interface CriarModuloDto {
   cor?: string;
 }
 
-export async function listarModulos(accessToken: string): Promise<Modulo[]> {
-  const response = await apiFetch('/modulos', accessToken);
+export async function listarModulos(accessToken: string, incluirInativos = false): Promise<Modulo[]> {
+  const response = await apiFetch(`/modulos${incluirInativos ? '?todos=true' : ''}`, accessToken);
   if (!response.ok) {
     throw new Error(`Falha ao listar módulos (status ${response.status})`);
   }
@@ -41,6 +41,7 @@ export interface AtualizarModuloDto {
   areas?: string;
   icone?: string;
   cor?: string;
+  ativo?: boolean;
 }
 
 export async function atualizarModulo(

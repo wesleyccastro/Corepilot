@@ -38,7 +38,7 @@ describe('ModuloController', () => {
     expect(service.create).not.toHaveBeenCalled();
   });
 
-  it('lista módulos da empresa do tenant atual', async () => {
+  it('lista módulos ativos da empresa do tenant atual por padrão', async () => {
     const service = {
       findAllByEmpresa: jest.fn().mockResolvedValue([{ id: 'modulo-1' }]),
     } as unknown as ModuloService;
@@ -47,8 +47,21 @@ describe('ModuloController', () => {
 
     const resultado = await controller.listar();
 
-    expect(service.findAllByEmpresa).toHaveBeenCalledWith('empresa-1');
+    expect(service.findAllByEmpresa).toHaveBeenCalledWith('empresa-1', false);
     expect(resultado).toEqual([{ id: 'modulo-1' }]);
+  });
+
+  it('lista módulos ativos e inativos quando ?todos=true', async () => {
+    const service = {
+      findAllByEmpresa: jest.fn().mockResolvedValue([{ id: 'modulo-1' }, { id: 'modulo-2' }]),
+    } as unknown as ModuloService;
+    const audit = buildAudit();
+    const controller = new ModuloController(service, audit, buildTenantContext('empresa-1'));
+
+    const resultado = await controller.listar('true');
+
+    expect(service.findAllByEmpresa).toHaveBeenCalledWith('empresa-1', true);
+    expect(resultado).toEqual([{ id: 'modulo-1' }, { id: 'modulo-2' }]);
   });
 
   it('atualiza um módulo da empresa do tenant atual e audita', async () => {

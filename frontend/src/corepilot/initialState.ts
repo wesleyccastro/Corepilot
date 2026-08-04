@@ -4,6 +4,7 @@ import type {
   AgentTask,
   AppUser,
   AutonomyLevel,
+  ConfirmDialogState,
   DsForm,
   DsQuery,
   KanbanColumn,
@@ -49,6 +50,10 @@ export interface CorePilotState {
   modulesLoading: boolean;
   modulesError: string | null;
   editingModule: ViewId | null;
+  confirmDialog: ConfirmDialogState | null;
+
+  todosModulos: Modulo[];
+  modulosAdminLoading: boolean;
 
   kanban: KanbanColumn[];
   comprasCard: string | null;
@@ -222,6 +227,10 @@ export function createInitialState(): CorePilotState {
     modulesLoading: true,
     modulesError: null,
     editingModule: null,
+    confirmDialog: null,
+
+    todosModulos: [],
+    modulosAdminLoading: false,
 
     kanban: [
       {

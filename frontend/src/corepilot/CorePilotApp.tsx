@@ -2,6 +2,7 @@ import { useCorePilotState } from './useCorePilotState';
 import { useMe } from './useMe';
 import { Header } from './components/Header';
 import { Toast } from './components/Toast';
+import { ConfirmDialog } from './components/ConfirmDialog';
 import { Overview } from './views/Overview';
 import { ComprasView } from './views/compras/ComprasView';
 import { FinanceiroView } from './views/financeiro/FinanceiroView';
@@ -10,6 +11,7 @@ import { Wizard } from './views/wizard/Wizard';
 import { AdminUsers } from './views/admin/AdminUsers';
 import { AdminSettings } from './views/admin/AdminSettings';
 import { AdminCompany } from './views/admin/AdminCompany';
+import { AdminModulos } from './views/admin/AdminModulos';
 
 export function CorePilotApp({ accessToken }: { accessToken: string }) {
   const { state, actions, refs } = useCorePilotState(accessToken);
@@ -28,10 +30,12 @@ export function CorePilotApp({ accessToken }: { accessToken: string }) {
         {state.view === 'admin-users' && <AdminUsers state={state} actions={actions} />}
         {state.view === 'admin-settings' && <AdminSettings state={state} actions={actions} />}
         {state.view === 'admin-company' && <AdminCompany state={state} actions={actions} />}
+        {state.view === 'admin-modulos' && <AdminModulos state={state} actions={actions} />}
         {activeModule && <CustomModuleView module={activeModule} state={state} actions={actions} />}
       </div>
 
       <Toast message={state.toast} />
+      <ConfirmDialog state={state} actions={actions} />
     </div>
   );
 }

@@ -23,9 +23,9 @@ export class ModuloService {
     });
   }
 
-  async findAllByEmpresa(empresaId: string) {
+  async findAllByEmpresa(empresaId: string, incluirInativos = false) {
     return this.prisma.modulo.findMany({
-      where: { empresaId },
+      where: incluirInativos ? { empresaId } : { empresaId, ativo: true },
       orderBy: { criadoEm: 'desc' },
     });
   }
@@ -56,6 +56,7 @@ export class ModuloService {
         areas: dto.areas,
         icone: dto.icone,
         cor: dto.cor,
+        ativo: dto.ativo,
       },
     });
   }

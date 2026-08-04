@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
@@ -37,9 +38,9 @@ export class ModuloController {
   }
 
   @Get()
-  async listar() {
+  async listar(@Query('todos') todos?: string) {
     const { empresaId } = this.tenantContext.get();
-    return this.moduloService.findAllByEmpresa(empresaId);
+    return this.moduloService.findAllByEmpresa(empresaId, todos === 'true');
   }
 
   @Patch(':id')

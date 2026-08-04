@@ -66,7 +66,15 @@ export function CustomModuleChatSidebar({ moduloId, state, actions, onConfigure 
       onTogglePin={(id) => void actions.fixarConversaModulo(moduloId, id)}
       onAssignTag={(id, tagId) => actions.atribuirTagConversaModulo(moduloId, id, tagId)}
       onArchive={(id) => void actions.arquivarConversaModulo(moduloId, id)}
-      onDelete={(id) => void actions.excluirConversaModulo(moduloId, id)}
+      onDelete={(id) =>
+        actions.abrirConfirmacao({
+          titulo: 'Excluir conversa',
+          mensagem: 'Essa conversa será excluída permanentemente. Essa ação não pode ser desfeita.',
+          confirmarLabel: 'Excluir',
+          perigo: true,
+          onConfirmar: () => void actions.excluirConversaModulo(moduloId, id),
+        })
+      }
       onRestore={(id) => void actions.desarquivarConversaModulo(moduloId, id)}
     />
   );

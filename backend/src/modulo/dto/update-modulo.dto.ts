@@ -7,4 +7,5 @@ export interface UpdateModuloDto {
   areas?: string;
   icone?: string;
   cor?: string;
+  ativo?: boolean;
 }

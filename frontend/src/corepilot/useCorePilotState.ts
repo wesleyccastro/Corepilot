@@ -6,6 +6,7 @@ import { emptyKnowledgeForm, emptyTaskForm } from './types';
 import type {
   AutonomyLevel,
   ChatMessage,
+  ConfirmDialogState,
   KnowledgeFormState,
   KnowledgeSourceType,
   ModuleChat,
@@ -520,6 +521,39 @@ export function useCorePilotState(accessToken: string) {
   const toggleUserMenu = () => update((s) => ({ userMenuOpen: !s.userMenuOpen }));
   const closeUserMenu = () => update({ userMenuOpen: false });
   const openUsersFromMenu = () => goAdminUsers();
+
+  const abrirConfirmacao = (config: ConfirmDialogState) => update({ confirmDialog: config });
+  const fecharConfirmacao = () => update({ confirmDialog: null });
+  const confirmarAcaoPendente = () => {
+    const dialog = state.confirmDialog;
+    update({ confirmDialog: null });
+    dialog?.onConfirmar();
+  };
+
+  const goAdminModulos = async () => {
+    update((s) => ({ view: 'admin-modulos', previousView: s.view, userMenuOpen: false, modulosAdminLoading: true }));
+    try {
+      const modulos = await listarModulos(accessToken, true);
+      update({ modulosAdminLoading: false, todosModulos: modulos });
+    } catch (err) {
+      update({ modulosAdminLoading: false, modulesError: err instanceof Error ? err.message : 'Erro ao carregar módulos' });
+    }
+  };
+
+  const alternarStatusModulo = async (moduloId: string, ativo: boolean) => {
+    try {
+      const atualizado = await atualizarModulo(accessToken, moduloId, { ativo });
+      update((s) => ({
+        todosModulos: s.todosModulos.map((m) => (m.id === moduloId ? atualizado : m)),
+        publishedModules: ativo
+          ? (s.publishedModules.some((m) => m.id === moduloId) ? s.publishedModules : [atualizado, ...s.publishedModules])
+          : s.publishedModules.filter((m) => m.id !== moduloId),
+      }));
+      showToast(ativo ? 'Módulo ativado.' : 'Módulo desativado.');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao atualizar módulo');
+    }
+  };
 
   const updateWaField = (field: keyof CorePilotState['waForm']) => (e: ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -1225,6 +1259,7 @@ export function useCorePilotState(accessToken: string) {
     sendComprasMessage, sendFinanceiroMessage, sendOverviewMessage, handleEnterSend, makeQuickAction,
     goAdminUsers, goAdminSettings, openGeneralSettings, openCompanySettings, backFromAdmin, setAdminTab,
     toggleUserMenu, closeUserMenu, openUsersFromMenu,
+    abrirConfirmacao, fecharConfirmacao, confirmarAcaoPendente, goAdminModulos, alternarStatusModulo,
     updateWaField, toggleWaExpanded, toggleChangeWaKey, updateWaNewKey, toggleWaNotifyTasks, setAdminSettingsTab, testWaConnection,
     toggleDsExpanded, toggleDsMenu, toggleQueriesSection, toggleSemanticSection, editConnectionFromMenu,
     updateDsField, toggleChangePassword, updateDsNewPassword, testConnection,

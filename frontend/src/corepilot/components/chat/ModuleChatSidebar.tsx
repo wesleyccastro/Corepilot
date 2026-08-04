@@ -93,7 +93,15 @@ export function ModuleChatSidebar({ module, state, actions, onConfigure }: Modul
       onTogglePin={(id) => actions.togglePinChat(listKey, id)}
       onAssignTag={(id, tagId) => actions.assignChatTag(listKey, id, tagId)}
       onArchive={(id) => actions.hideChat(listKey, id)}
-      onDelete={(id) => actions.deleteChat(listKey, id)}
+      onDelete={(id) =>
+        actions.abrirConfirmacao({
+          titulo: 'Excluir conversa',
+          mensagem: 'Essa conversa será excluída permanentemente. Essa ação não pode ser desfeita.',
+          confirmarLabel: 'Excluir',
+          perigo: true,
+          onConfirmar: () => actions.deleteChat(listKey, id),
+        })
+      }
       onRestore={(id) => actions.restoreChat(listKey, id)}
     />
   );

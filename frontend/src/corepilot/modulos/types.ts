@@ -9,6 +9,7 @@ export interface Modulo {
   icone: string | null;
   cor: string | null;
   modeloIA: string;
+  ativo: boolean;
   criadoEm: string;
 }
 

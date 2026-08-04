@@ -1,7 +1,7 @@
 import type { CorePilotState } from '../initialState';
 import type { CorePilotActions } from '../useCorePilotState';
 import type { MeResponse } from '../useMe';
-import { BellIcon, BuildingIcon, ChevronDownIcon, CorePilotLogoIcon, GearIcon, LogoutIcon, PlusIcon, SearchIcon, UsersIcon } from '../icons';
+import { BellIcon, BuildingIcon, ChevronDownIcon, CorePilotLogoIcon, GearIcon, LayersIcon, LogoutIcon, PlusIcon, SearchIcon, UsersIcon } from '../icons';
 import { colors, overlayFixed } from '../styles';
 
 interface HeaderProps {
@@ -72,6 +72,10 @@ export function Header({ state, actions, me }: HeaderProps) {
                   <div onClick={actions.openCompanySettings} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', cursor: 'pointer', color: colors.text }}>
                     <BuildingIcon />
                     <span style={{ fontSize: 13, fontWeight: 600 }}>Configurações da empresa</span>
+                  </div>
+                  <div onClick={() => void actions.goAdminModulos()} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', cursor: 'pointer', color: colors.text }}>
+                    <LayersIcon size={15} color={colors.textMuted} />
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>Módulos</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', cursor: 'pointer', color: colors.danger, borderTop: `1px solid ${colors.borderLight}` }}>
                     <LogoutIcon />
