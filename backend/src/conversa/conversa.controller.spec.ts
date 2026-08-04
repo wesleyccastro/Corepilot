@@ -32,4 +32,28 @@ describe('ConversaController', () => {
     expect(service.findAllByModuloAndUsuario).toHaveBeenCalledWith('modulo-1', 'usuario-1');
     expect(resultado).toEqual([{ id: 'conversa-1' }]);
   });
+
+  it('atualiza uma conversa do usuário do tenant atual', async () => {
+    const service = {
+      update: jest.fn().mockResolvedValue({ id: 'conversa-1', arquivada: true }),
+    } as unknown as ConversaService;
+    const controller = new ConversaController(service, buildTenantContext());
+
+    const resultado = await controller.atualizar('conversa-1', { arquivada: true });
+
+    expect(service.update).toHaveBeenCalledWith('conversa-1', 'usuario-1', { arquivada: true });
+    expect(resultado).toEqual({ id: 'conversa-1', arquivada: true });
+  });
+
+  it('remove uma conversa do usuário do tenant atual', async () => {
+    const service = {
+      remove: jest.fn().mockResolvedValue(undefined),
+    } as unknown as ConversaService;
+    const controller = new ConversaController(service, buildTenantContext());
+
+    const resultado = await controller.remover('conversa-1');
+
+    expect(service.remove).toHaveBeenCalledWith('conversa-1', 'usuario-1');
+    expect(resultado).toEqual({ ok: true });
+  });
 });
