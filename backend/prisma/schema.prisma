@@ -18,6 +18,7 @@ model Empresa {
   conversas     Conversa[]
   agentes       Agente[]
   fontesDeDados FonteDeDados[]
+  conversaTags  ConversaTag[]
 }
 
 model Usuario {
@@ -76,10 +77,11 @@ model Modulo {
   modeloIA    String   @default("claude-sonnet-5")
   criadoEm    DateTime @default(now())
 
-  empresa   Empresa                 @relation(fields: [empresaId], references: [id])
-  conversas Conversa[]
-  agentes   Agente[]
-  consultas ConsultaParametrizada[]
+  empresa      Empresa                 @relation(fields: [empresaId], references: [id])
+  conversas    Conversa[]
+  agentes      Agente[]
+  consultas    ConsultaParametrizada[]
+  conversaTags ConversaTag[]
 }
 
 model Conversa {
@@ -88,13 +90,29 @@ model Conversa {
   moduloId     String
   usuarioId    String
   titulo       String?
+  arquivada    Boolean  @default(false)
+  fixada       Boolean  @default(false)
+  tagId        String?
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
+  empresa   Empresa      @relation(fields: [empresaId], references: [id])
+  modulo    Modulo       @relation(fields: [moduloId], references: [id])
+  usuario   Usuario      @relation(fields: [usuarioId], references: [id])
+  tag       ConversaTag? @relation(fields: [tagId], references: [id], onDelete: SetNull)
+  mensagens Mensagem[]
+}
+
+model ConversaTag {
+  id        String   @id @default(uuid())
+  empresaId String
+  moduloId  String
+  nome      String
+  criadoEm  DateTime @default(now())
+
   empresa   Empresa    @relation(fields: [empresaId], references: [id])
   modulo    Modulo     @relation(fields: [moduloId], references: [id])
-  usuario   Usuario    @relation(fields: [usuarioId], references: [id])
-  mensagens Mensagem[]
+  conversas Conversa[]
 }
 
 enum PapelMensagem {
