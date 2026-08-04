@@ -91,7 +91,7 @@ export function ChatSidebarShell(props: ChatSidebarShellProps) {
           </div>
         )}
         {onConfigure && (
-          <span onClick={onConfigure} title="Configurar módulo" style={{ cursor: 'pointer', width: 38, height: 38, border: `1px solid ${colors.border}`, borderRadius: 8, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <span onClick={onConfigure} title="Configurar módulo" style={{ cursor: 'pointer', width: 38, height: 38, border: `1px solid ${colors.border}`, borderRadius: 9, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <GearIcon />
           </span>
         )}
@@ -168,9 +168,6 @@ export function ChatSidebarShell(props: ChatSidebarShellProps) {
               onDelete={() => onDelete(item.id)}
             />
           ))}
-          {visibleItems.length === 0 && (
-            <div style={{ fontSize: 12.5, color: colors.textFaint, padding: '10px 0' }}>Nenhuma conversa ainda.</div>
-          )}
         </>
       ) : (
         <>
