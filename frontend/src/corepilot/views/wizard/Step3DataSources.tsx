@@ -217,16 +217,36 @@ export function Step3DataSources({ state, actions }: { state: CorePilotState; ac
                     ))}
                   </div>
                 )}
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '0 16px 12px' }}>
-                  <input
-                    type="checkbox"
-                    checked={consulta.sincronizacaoAtiva}
-                    disabled={!consulta.testada}
-                    onChange={() => void actions.toggleSincronizacaoConsultaReal(consulta)}
-                  />
-                  Sincronização ativa
-                  {consulta.ultimaSincronizacaoEm && ` (última: ${consulta.ultimaSincronizacaoEm})`}
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '0 16px 12px', flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                    <input
+                      type="checkbox"
+                      checked={consulta.sincronizacaoAtiva}
+                      disabled={!consulta.testada}
+                      onChange={() => void actions.toggleSincronizacaoConsultaReal(consulta)}
+                    />
+                    Sincronização ativa
+                    {consulta.ultimaSincronizacaoEm && ` (última: ${consulta.ultimaSincronizacaoEm})`}
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: colors.textMuted }}>
+                    A cada
+                    <select
+                      value={consulta.intervaloSincronizacaoMinutos ?? 60}
+                      disabled={!consulta.testada}
+                      onChange={(e) => void actions.atualizarIntervaloConsultaReal(consulta, Number(e.target.value))}
+                      style={{ ...inputSm, padding: '4px 8px', fontSize: 12 }}
+                    >
+                      <option value={5}>5 minutos</option>
+                      <option value={15}>15 minutos</option>
+                      <option value={30}>30 minutos</option>
+                      <option value={60}>1 hora</option>
+                      <option value={180}>3 horas</option>
+                      <option value={360}>6 horas</option>
+                      <option value={720}>12 horas</option>
+                      <option value={1440}>24 horas</option>
+                    </select>
+                  </label>
+                </div>
               </div>
             );
           })}

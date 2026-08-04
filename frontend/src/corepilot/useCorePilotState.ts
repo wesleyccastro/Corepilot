@@ -1000,6 +1000,10 @@ export function useCorePilotState(accessToken: string) {
     const atualizada = await atualizarSincronizacao(accessToken, consulta.id, !consulta.sincronizacaoAtiva, consulta.intervaloSincronizacaoMinutos ?? 60);
     update((s) => ({ moduloConsultas: s.moduloConsultas.map((c) => (c.id === atualizada.id ? atualizada : c)) }));
   };
+  const atualizarIntervaloConsultaReal = async (consulta: Consulta, intervaloMinutos: number) => {
+    const atualizada = await atualizarSincronizacao(accessToken, consulta.id, consulta.sincronizacaoAtiva, intervaloMinutos);
+    update((s) => ({ moduloConsultas: s.moduloConsultas.map((c) => (c.id === atualizada.id ? atualizada : c)) }));
+  };
 
   // --- Testar skill real ---
   const selecionarSkillParaTeste = (skillId: string) => update({ skillTestSelecionadaId: skillId, skillTestResultado: null, skillTestErro: null });
@@ -1278,6 +1282,7 @@ export function useCorePilotState(accessToken: string) {
     editarFonte, cancelarEdicaoFonte, updateEditFonteField, salvarEdicaoFonte,
     carregarConsultasDoModulo, toggleNovaConsultaForm, updateNovaConsultaField, adicionarParametroConsulta, atualizarParametroConsulta,
     adicionarCampoFiltroConsulta, atualizarCampoFiltroConsulta, salvarNovaConsultaReal, testarConsultaReal, toggleSincronizacaoConsultaReal,
+    atualizarIntervaloConsultaReal,
     selecionarSkillParaTeste, updateSkillTestEntrada, executarTesteSkillReal,
     carregarConversaDoModulo, updateModuloChatDraft, enviarMensagemModuloReal,
     criarConversaModulo, selecionarConversaModulo, arquivarConversaModulo, desarquivarConversaModulo,
