@@ -57,3 +57,21 @@ export async function atualizarModulo(
   if (!response.ok) throw new Error(`Falha ao atualizar módulo (status ${response.status})`);
   return (await response.json()) as Modulo;
 }
+
+export interface RascunhoInstrucoes {
+  instrucoes: string;
+}
+
+export async function rascunharInstrucoesModulo(
+  accessToken: string,
+  moduloId: string,
+  brief?: string,
+): Promise<RascunhoInstrucoes> {
+  const response = await apiFetch(`/modulos/${moduloId}/rascunho-instrucoes`, accessToken, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ brief }),
+  });
+  if (!response.ok) throw new Error(`Falha ao gerar rascunho de instruções (status ${response.status})`);
+  return (await response.json()) as RascunhoInstrucoes;
+}

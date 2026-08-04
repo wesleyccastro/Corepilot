@@ -27,9 +27,11 @@ import {
   listarAgentes,
   listarSkills,
   executarSkill,
+  rascunharGuardrailsAgente,
+  rascunharCamposSaidaSkill,
 } from './agentes/api';
 import { atualizarFonteDeDados, criarFonteDeDados, listarFontesDeDados } from './fontes-de-dados/api';
-import { atualizarModulo, criarModulo, listarModulos } from './modulos/api';
+import { atualizarModulo, criarModulo, listarModulos, rascunharInstrucoesModulo } from './modulos/api';
 import {
   atualizarSincronizacao,
   criarConsulta,
@@ -787,6 +789,25 @@ export function useCorePilotState(accessToken: string) {
       update({ wizardError: err instanceof Error ? err.message : 'Erro ao atualizar agente' });
     }
   };
+  const gerarRascunhoInstrucoesModulo = async (brief: string) => {
+    const moduloId = state.currentModuloId;
+    if (!moduloId) return;
+    const resultado = await rascunharInstrucoesModulo(accessToken, moduloId, brief);
+    update({ instructions: resultado.instrucoes });
+  };
+  const gerarRascunhoGuardrailsAgente = async (agenteId: string, brief: string) => {
+    const moduloId = state.currentModuloId;
+    if (!moduloId) throw new Error('Módulo não encontrado');
+    return rascunharGuardrailsAgente(accessToken, moduloId, agenteId, brief);
+  };
+  const gerarRascunhoSkill = async (
+    agenteId: string,
+    params: { skillNome?: string; skillObjetivo?: string; brief?: string },
+  ) => {
+    const moduloId = state.currentModuloId;
+    if (!moduloId) throw new Error('Módulo não encontrado');
+    return rascunharCamposSaidaSkill(accessToken, moduloId, agenteId, params);
+  };
 
   // --- Skills reais ---
   const carregarSkillsDoAgente = async (agenteId: string) => {
@@ -820,6 +841,8 @@ export function useCorePilotState(accessToken: string) {
   const adicionarCampoSaida = () => update((s) => ({ skillFormCampos: [...s.skillFormCampos, { nome: '', tipo: 'string', descricao: '', obrigatorio: true }] }));
   const atualizarCampoSaida = (indice: number, parcial: Partial<CampoSaida>) => update((s) => ({ skillFormCampos: s.skillFormCampos.map((c, i) => (i === indice ? { ...c, ...parcial } : c)) }));
   const removerCampoSaida = (indice: number) => update((s) => ({ skillFormCampos: s.skillFormCampos.filter((_, i) => i !== indice) }));
+  const aplicarRascunhoCamposSaida = (campos: CampoSaida[]) =>
+    update({ skillFormCampos: campos.map((c) => ({ ...c, descricao: c.descricao ?? '' })) });
   const toggleFerramentaSkill = (consultaId: string) => update((s) => ({
     skillFerramentasSelecionadas: s.skillFerramentasSelecionadas.includes(consultaId)
       ? s.skillFerramentasSelecionadas.filter((id) => id !== consultaId)
@@ -1276,8 +1299,10 @@ export function useCorePilotState(accessToken: string) {
     chatListKeyFor,
 
     carregarAgentesDoModulo, selecionarAgente, toggleNovoAgenteForm, updateNovoAgenteField, criarNovoAgenteReal, atualizarAgenteReal,
+    gerarRascunhoInstrucoesModulo, gerarRascunhoGuardrailsAgente, gerarRascunhoSkill,
     carregarSkillsDoAgente, abrirNovaSkill, abrirEdicaoSkill, cancelarEdicaoSkill, updateSkillFormNome, updateSkillFormObjetivo,
     adicionarCampoSaida, atualizarCampoSaida, removerCampoSaida, toggleFerramentaSkill, salvarSkillReal,
+    aplicarRascunhoCamposSaida,
     carregarFontesDeDados, toggleNovaFonteForm, updateNovaFonteField, salvarNovaFonteReal,
     editarFonte, cancelarEdicaoFonte, updateEditFonteField, salvarEdicaoFonte,
     carregarConsultasDoModulo, toggleNovaConsultaForm, updateNovaConsultaField, adicionarParametroConsulta, atualizarParametroConsulta,

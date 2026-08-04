@@ -146,3 +146,48 @@ export async function atualizarSkill(
   if (!response.ok) throw new Error(`Falha ao atualizar skill (status ${response.status})`);
   return (await response.json()) as Skill;
 }
+
+export interface RascunhoGuardrails {
+  guardrails: string;
+  regraEscalonamento: string;
+}
+
+export async function rascunharGuardrailsAgente(
+  accessToken: string,
+  moduloId: string,
+  agenteId: string,
+  brief?: string,
+): Promise<RascunhoGuardrails> {
+  const response = await apiFetch(`/modulos/${moduloId}/agentes/${agenteId}/rascunho-guardrails`, accessToken, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ brief }),
+  });
+  if (!response.ok) throw new Error(`Falha ao gerar rascunho de guardrails (status ${response.status})`);
+  return (await response.json()) as RascunhoGuardrails;
+}
+
+export interface RascunharSkillParams {
+  skillNome?: string;
+  skillObjetivo?: string;
+  brief?: string;
+}
+
+export interface RascunhoSkill {
+  camposSaida: CampoSaida[];
+}
+
+export async function rascunharCamposSaidaSkill(
+  accessToken: string,
+  moduloId: string,
+  agenteId: string,
+  params: RascunharSkillParams,
+): Promise<RascunhoSkill> {
+  const response = await apiFetch(`/modulos/${moduloId}/agentes/${agenteId}/rascunho-skill`, accessToken, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!response.ok) throw new Error(`Falha ao gerar rascunho de campos de saída (status ${response.status})`);
+  return (await response.json()) as RascunhoSkill;
+}
