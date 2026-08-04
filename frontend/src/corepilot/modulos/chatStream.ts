@@ -13,6 +13,33 @@ export async function criarConversa(accessToken: string, moduloId: string): Prom
   return (await response.json()) as Conversa;
 }
 
+export interface AtualizarConversaDto {
+  titulo?: string;
+  arquivada?: boolean;
+  fixada?: boolean;
+  tagId?: string | null;
+}
+
+export async function atualizarConversa(
+  accessToken: string,
+  moduloId: string,
+  conversaId: string,
+  dto: AtualizarConversaDto,
+): Promise<Conversa> {
+  const response = await apiFetch(`/modulos/${moduloId}/conversas/${conversaId}`, accessToken, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(dto),
+  });
+  if (!response.ok) throw new Error(`Falha ao atualizar conversa (status ${response.status})`);
+  return (await response.json()) as Conversa;
+}
+
+export async function excluirConversa(accessToken: string, moduloId: string, conversaId: string): Promise<void> {
+  const response = await apiFetch(`/modulos/${moduloId}/conversas/${conversaId}`, accessToken, { method: 'DELETE' });
+  if (!response.ok) throw new Error(`Falha ao excluir conversa (status ${response.status})`);
+}
+
 export async function listarMensagens(accessToken: string, conversaId: string): Promise<Mensagem[]> {
   const response = await apiFetch(`/conversas/${conversaId}/mensagens`, accessToken);
   if (!response.ok) throw new Error(`Falha ao listar mensagens (status ${response.status})`);

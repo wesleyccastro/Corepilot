@@ -16,8 +16,18 @@ export interface Conversa {
   id: string;
   moduloId: string;
   titulo: string | null;
+  arquivada: boolean;
+  fixada: boolean;
+  tagId: string | null;
   criadoEm: string;
   atualizadoEm: string;
+}
+
+export interface ConversaTag {
+  id: string;
+  moduloId: string;
+  nome: string;
+  criadoEm: string;
 }
 
 export type PapelMensagem = 'usuario' | 'agente';
