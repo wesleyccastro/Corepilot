@@ -97,6 +97,7 @@ describe('ModuloController', () => {
         id: 'modulo-1',
         nome: 'Agronomia',
         objetivo: 'Gestão agronômica das fazendas',
+        modeloIA: 'claude-sonnet-5',
       }),
     } as unknown as ModuloService;
     const audit = buildAudit();
@@ -114,6 +115,7 @@ describe('ModuloController', () => {
     expect(anthropicService.parseStructured).toHaveBeenCalledWith(
       expect.objectContaining({
         mensagem: expect.stringContaining('foco em rastreabilidade'),
+        model: 'claude-sonnet-5',
         maxTokens: 2048,
       }),
     );
@@ -128,7 +130,9 @@ describe('ModuloController', () => {
 
   it('rascunho de instruções lança 422 quando a IA não devolve saída validável', async () => {
     const service = {
-      findByIdInEmpresa: jest.fn().mockResolvedValue({ id: 'modulo-1', nome: 'Agronomia', objetivo: 'X' }),
+      findByIdInEmpresa: jest
+        .fn()
+        .mockResolvedValue({ id: 'modulo-1', nome: 'Agronomia', objetivo: 'X', modeloIA: 'claude-sonnet-5' }),
     } as unknown as ModuloService;
     const audit = buildAudit();
     const anthropicService = buildAnthropicService({

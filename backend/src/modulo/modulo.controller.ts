@@ -83,7 +83,7 @@ export class ModuloController {
     const response = await this.anthropicService.parseStructured({
       system,
       mensagem,
-      model: 'claude-sonnet-5',
+      model: modulo.modeloIA,
       maxTokens: 2048,
       schema: RASCUNHO_INSTRUCOES_SCHEMA,
     });
