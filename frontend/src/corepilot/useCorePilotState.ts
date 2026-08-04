@@ -35,7 +35,15 @@ import {
   listarConsultas,
   testarConsulta,
 } from './consultas/api';
-import { criarConversa, enviarMensagemStreaming, listarConversas, listarMensagens } from './modulos/chatStream';
+import {
+  atualizarConversa,
+  criarConversa,
+  enviarMensagemStreaming,
+  excluirConversa,
+  listarConversas,
+  listarMensagens,
+} from './modulos/chatStream';
+import { criarTag, listarTags, removerTag } from './modulos/tags-api';
 import { emptyEditFonteForm, emptyNovaConsultaForm, emptyNovaFonteForm, emptyNovoAgenteForm } from './types';
 import type { CampoSaida, Skill as SkillReal } from './agentes/types';
 import type { Consulta } from './consultas/types';
@@ -974,15 +982,173 @@ export function useCorePilotState(accessToken: string) {
     }
   };
 
-  // --- Chat real do módulo ---
+  // --- Chat real do módulo (histórico, organização, bases conectadas) ---
   const carregarConversaDoModulo = async (moduloId: string) => {
+    update({ moduloConversasLoading: true, moduloChatErro: null });
     try {
-      const conversas = await listarConversas(accessToken, moduloId);
-      const conversa = conversas[0] ?? (await criarConversa(accessToken, moduloId));
-      const mensagens = await listarMensagens(accessToken, conversa.id);
-      update({ moduloConversaId: conversa.id, moduloMensagens: mensagens });
+      const [conversas, tags, consultas] = await Promise.all([
+        listarConversas(accessToken, moduloId),
+        listarTags(accessToken, moduloId),
+        listarConsultas(accessToken, moduloId),
+      ]);
+
+      let fontes = state.moduloFontesDeDados;
+      if (fontes.length === 0) {
+        fontes = await listarFontesDeDados(accessToken);
+        update({ moduloFontesDeDados: fontes });
+      }
+      const idsFontesUsadas = new Set(consultas.map((c) => c.fonteDeDadosId));
+      const basesConectadas = fontes.filter((f) => idsFontesUsadas.has(f.id)).map((f) => f.nome);
+
+      const primeiraVisivel = conversas.find((c) => !c.arquivada);
+      const mensagens = primeiraVisivel ? await listarMensagens(accessToken, primeiraVisivel.id) : [];
+
+      update({
+        moduloConversasLoading: false,
+        moduloConversas: conversas,
+        moduloTags: tags,
+        moduloBasesConectadas: basesConectadas,
+        moduloConversaId: primeiraVisivel?.id ?? null,
+        moduloMensagens: mensagens,
+        moduloActiveTagId: 'all',
+        moduloArchiveView: false,
+      });
     } catch (err) {
-      update({ moduloChatErro: err instanceof Error ? err.message : 'Erro ao carregar conversa' });
+      update({ moduloConversasLoading: false, moduloChatErro: err instanceof Error ? err.message : 'Erro ao carregar conversas' });
+    }
+  };
+
+  const criarConversaModulo = async (moduloId: string) => {
+    try {
+      const conversa = await criarConversa(accessToken, moduloId);
+      update((s) => ({
+        moduloConversas: [conversa, ...s.moduloConversas],
+        moduloConversaId: conversa.id,
+        moduloMensagens: [],
+        moduloArchiveView: false,
+      }));
+    } catch (err) {
+      update({ moduloChatErro: err instanceof Error ? err.message : 'Erro ao criar conversa' });
+    }
+  };
+
+  const selecionarConversaModulo = async (conversaId: string) => {
+    if (conversaId === state.moduloConversaId) return;
+    update({ moduloConversaId: conversaId, moduloMensagens: [], moduloChatErro: null });
+    try {
+      const mensagens = await listarMensagens(accessToken, conversaId);
+      update({ moduloMensagens: mensagens });
+    } catch (err) {
+      update({ moduloChatErro: err instanceof Error ? err.message : 'Erro ao carregar mensagens' });
+    }
+  };
+
+  const trocarParaProximaConversaVisivel = (conversaIdRemovida: string) => {
+    const proximaVisivel = state.moduloConversas.find((c) => c.id !== conversaIdRemovida && !c.arquivada);
+    if (proximaVisivel) void selecionarConversaModulo(proximaVisivel.id);
+    else update({ moduloConversaId: null, moduloMensagens: [] });
+  };
+
+  const arquivarConversaModulo = async (moduloId: string, conversaId: string) => {
+    const eraAtiva = state.moduloConversaId === conversaId;
+    update((s) => ({
+      moduloConversas: s.moduloConversas.map((c) => (c.id === conversaId ? { ...c, arquivada: true } : c)),
+      chatMenuOpenId: null,
+    }));
+    if (eraAtiva) trocarParaProximaConversaVisivel(conversaId);
+    try {
+      await atualizarConversa(accessToken, moduloId, conversaId, { arquivada: true });
+      showToast('Conversa arquivada.');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao arquivar conversa');
+    }
+  };
+
+  const desarquivarConversaModulo = async (moduloId: string, conversaId: string) => {
+    update((s) => ({
+      moduloConversas: s.moduloConversas.map((c) => (c.id === conversaId ? { ...c, arquivada: false } : c)),
+    }));
+    try {
+      await atualizarConversa(accessToken, moduloId, conversaId, { arquivada: false });
+      showToast('Conversa desarquivada.');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao desarquivar conversa');
+    }
+  };
+
+  const fixarConversaModulo = async (moduloId: string, conversaId: string) => {
+    const conversa = state.moduloConversas.find((c) => c.id === conversaId);
+    if (!conversa) return;
+    const novaFixada = !conversa.fixada;
+    update((s) => ({
+      moduloConversas: s.moduloConversas.map((c) => (c.id === conversaId ? { ...c, fixada: novaFixada } : c)),
+      chatMenuOpenId: null,
+    }));
+    try {
+      await atualizarConversa(accessToken, moduloId, conversaId, { fixada: novaFixada });
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao fixar conversa');
+    }
+  };
+
+  const excluirConversaModulo = async (moduloId: string, conversaId: string) => {
+    const eraAtiva = state.moduloConversaId === conversaId;
+    update((s) => ({
+      moduloConversas: s.moduloConversas.filter((c) => c.id !== conversaId),
+      chatMenuOpenId: null,
+    }));
+    if (eraAtiva) trocarParaProximaConversaVisivel(conversaId);
+    try {
+      await excluirConversa(accessToken, moduloId, conversaId);
+      showToast('Conversa excluída.');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao excluir conversa');
+    }
+  };
+
+  const atualizarBuscaConversasModulo = (e: ChangeEvent<HTMLInputElement>) => update({ moduloConversasSearch: e.target.value });
+  const abrirArquivadasModulo = () => update({ moduloArchiveView: true });
+  const fecharArquivadasModulo = () => update({ moduloArchiveView: false });
+  const toggleTagsExpandedModulo = () => update((s) => ({ moduloTagsExpanded: !s.moduloTagsExpanded }));
+  const definirTagAtivaModulo = (tagId: string) => update({ moduloActiveTagId: tagId });
+  const toggleNewTagFormModulo = () => update((s) => ({ moduloShowNewTagForm: !s.moduloShowNewTagForm, moduloNewTagName: '' }));
+  const updateNewTagNameModulo = (e: ChangeEvent<HTMLInputElement>) => update({ moduloNewTagName: e.target.value });
+  const toggleBasesModulo = () => update((s) => ({ moduloBasesOpen: !s.moduloBasesOpen }));
+
+  const criarTagModulo = async (moduloId: string) => {
+    const nome = state.moduloNewTagName.trim();
+    if (!nome) return;
+    try {
+      const tag = await criarTag(accessToken, moduloId, nome);
+      update((s) => ({ moduloTags: [...s.moduloTags, tag], moduloShowNewTagForm: false, moduloNewTagName: '' }));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao criar tag');
+    }
+  };
+
+  const removerTagModulo = async (moduloId: string, tagId: string) => {
+    try {
+      await removerTag(accessToken, moduloId, tagId);
+      update((s) => ({
+        moduloTags: s.moduloTags.filter((t) => t.id !== tagId),
+        moduloActiveTagId: s.moduloActiveTagId === tagId ? 'all' : s.moduloActiveTagId,
+        moduloConversas: s.moduloConversas.map((c) => (c.tagId === tagId ? { ...c, tagId: null } : c)),
+      }));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao remover tag');
+    }
+  };
+
+  const atribuirTagConversaModulo = (moduloId: string, conversaId: string, tagId: string) => async (e: { stopPropagation: () => void }) => {
+    e.stopPropagation();
+    update((s) => ({
+      moduloConversas: s.moduloConversas.map((c) => (c.id === conversaId ? { ...c, tagId } : c)),
+      chatMenuOpenId: null,
+    }));
+    try {
+      await atualizarConversa(accessToken, moduloId, conversaId, { tagId });
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao atribuir tag');
     }
   };
   const updateModuloChatDraft = (e: ChangeEvent<HTMLTextAreaElement>) => update({ moduloChatDraft: e.target.value });
@@ -1054,6 +1220,11 @@ export function useCorePilotState(accessToken: string) {
     adicionarCampoFiltroConsulta, atualizarCampoFiltroConsulta, salvarNovaConsultaReal, testarConsultaReal, toggleSincronizacaoConsultaReal,
     selecionarSkillParaTeste, updateSkillTestEntrada, executarTesteSkillReal,
     carregarConversaDoModulo, updateModuloChatDraft, enviarMensagemModuloReal,
+    criarConversaModulo, selecionarConversaModulo, arquivarConversaModulo, desarquivarConversaModulo,
+    fixarConversaModulo, excluirConversaModulo, atualizarBuscaConversasModulo,
+    abrirArquivadasModulo, fecharArquivadasModulo, toggleTagsExpandedModulo, definirTagAtivaModulo,
+    toggleNewTagFormModulo, updateNewTagNameModulo, toggleBasesModulo,
+    criarTagModulo, removerTagModulo, atribuirTagConversaModulo,
   };
 
   return {
