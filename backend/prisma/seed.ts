@@ -39,7 +39,7 @@ async function seedEmpresaComAdmin(
 
   await provisionUsuarioParaEmpresa(prisma, {
     supabaseUserId: authUser.id,
-    nome: email.split('@')[0],
+    nome: 'Admin',
     email,
     empresaId: empresa.id,
     perfil: 'admin',
