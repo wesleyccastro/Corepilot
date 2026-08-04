@@ -462,7 +462,7 @@ export function createInitialState(): CorePilotState {
     moduloChatStatus: null,
 
     moduloConversas: [],
-    moduloConversasLoading: false,
+    moduloConversasLoading: true,
     moduloConversasSearch: '',
     moduloTags: [],
     moduloActiveTagId: 'all',
