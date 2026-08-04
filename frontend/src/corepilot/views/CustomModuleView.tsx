@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CorePilotState } from '../initialState';
 import type { CorePilotActions } from '../useCorePilotState';
-import { LayersIcon } from '../icons';
 import { colors } from '../styles';
 import type { Modulo } from '../modulos/types';
 import { ChatComposer } from '../components/chat/ChatComposer';
@@ -43,14 +42,6 @@ export function CustomModuleView({ module, state, actions }: { module: Modulo; s
     <div style={{ margin: 0, padding: '24px 16px 16px 24px', height: '100%', display: 'grid', gridTemplateColumns: '280px 1fr', gap: 24 }}>
       <CustomModuleChatSidebar moduloId={module.id} state={state} actions={actions} onConfigure={actions.editActiveModule} />
       <div style={{ maxWidth: 900, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-        <div style={{ textAlign: 'center', marginBottom: 24, flexShrink: 0 }}>
-          <div style={{ width: 52, height: 52, borderRadius: 14, background: module.cor ?? colors.teal, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-            <LayersIcon />
-          </div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: colors.navy, margin: '0 0 8px' }}>{module.nome}</h1>
-          <p style={{ fontSize: 14, color: colors.textMuted, margin: 0 }}>{module.objetivo}</p>
-        </div>
-
         {state.moduloChatErro && <div style={{ color: colors.danger, fontSize: 13, marginBottom: 12, flexShrink: 0 }}>{state.moduloChatErro}</div>}
 
         {!state.moduloConversaId && !state.moduloConversasLoading ? (
