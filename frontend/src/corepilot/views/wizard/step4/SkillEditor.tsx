@@ -1,6 +1,7 @@
 import type { CorePilotState } from '../../../initialState';
 import type { CorePilotActions } from '../../../useCorePilotState';
 import { ToggleSwitch } from '../../../icons';
+import { GerarRascunhoButton } from '../../../components/GerarRascunhoButton';
 import { btnDark, btnSecondary, colors, input, inputSm, label } from '../../../styles';
 import type { TipoCampoSaida } from '../../../agentes/types';
 
@@ -25,6 +26,18 @@ export function AgentSkillEditorTab({ state, actions }: { state: CorePilotState;
           <label style={label}>Objetivo</label>
           <textarea rows={2} value={state.skillFormObjetivo} onChange={actions.updateSkillFormObjetivo} style={{ ...input, width: '100%', resize: 'vertical' }} />
         </div>
+
+        <GerarRascunhoButton
+          onGerar={async (brief) => {
+            if (!state.selectedAgenteId) return;
+            const rascunho = await actions.gerarRascunhoSkill(state.selectedAgenteId, {
+              skillNome: state.skillFormNome,
+              skillObjetivo: state.skillFormObjetivo,
+              brief,
+            });
+            actions.aplicarRascunhoCamposSaida(rascunho.camposSaida);
+          }}
+        />
 
         <div>
           <label style={{ ...label, marginBottom: 8 }}>Campos de saída</label>
