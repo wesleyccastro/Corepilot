@@ -20,10 +20,22 @@ import { AgenteService } from './agente.service';
 import type { CreateAgenteDto } from './dto/create-agente.dto';
 import type { UpdateAgenteDto } from './dto/update-agente.dto';
 import type { RascunharGuardrailsDto } from './dto/rascunhar-guardrails.dto';
+import type { RascunharSkillDto } from './dto/rascunhar-skill.dto';
 
 const RASCUNHO_GUARDRAILS_SCHEMA = z.object({
   guardrails: z.string(),
   regraEscalonamento: z.string(),
+});
+
+const RASCUNHO_SKILL_SCHEMA = z.object({
+  camposSaida: z.array(
+    z.object({
+      nome: z.string(),
+      tipo: z.enum(['string', 'number', 'boolean', 'string[]']),
+      obrigatorio: z.boolean(),
+      descricao: z.string().optional(),
+    }),
+  ),
 });
 
 @Controller('modulos/:moduloId/agentes')
@@ -115,6 +127,59 @@ export class AgenteController {
       acao: 'rascunho_ia_gerado',
       dadosDepois: {
         tipo: 'guardrails_agente',
+        agenteId,
+        tokensEntrada: response.usage.input_tokens,
+        tokensSaida: response.usage.output_tokens,
+      },
+    });
+
+    return response.parsed_output;
+  }
+
+  @Post(':agenteId/rascunho-skill')
+  async rascunharSkill(
+    @Param('moduloId') _moduloId: string,
+    @Param('agenteId') agenteId: string,
+    @Body() body: RascunharSkillDto,
+  ) {
+    if (!body.brief?.trim() && !body.skillObjetivo?.trim()) {
+      throw new BadRequestException('Informe o objetivo da skill ou descreva o que você precisa');
+    }
+
+    const { usuarioId, empresaId } = this.tenantContext.get();
+    const agente = await this.agenteService.findByIdInEmpresa(agenteId, empresaId);
+
+    const system =
+      'Você ajuda a definir o contrato de saída (campos estruturados) de uma skill de agente de IA dentro do CorePilot. Os tipos disponíveis são apenas: string, number, boolean, string[].';
+    const mensagem = [
+      `Agente: "${agente.nome}" (${agente.funcao})`,
+      body.skillNome?.trim() ? `Nome da skill: ${body.skillNome.trim()}` : null,
+      body.skillObjetivo?.trim() ? `Objetivo da skill: ${body.skillObjetivo.trim()}` : null,
+      body.brief?.trim() ? `O que o usuário pediu: ${body.brief.trim()}` : null,
+      '',
+      'Defina de 2 a 6 campos de saída estruturados que essa skill deve retornar, cada um com nome (em snake_case), tipo, se é obrigatório, e uma descrição curta.',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const response = await this.anthropicService.parseStructured({
+      system,
+      mensagem,
+      model: agente.modeloIA,
+      maxTokens: 2048,
+      schema: RASCUNHO_SKILL_SCHEMA,
+    });
+
+    if (!response.parsed_output) {
+      throw new UnprocessableEntityException('A resposta da IA não pôde ser validada');
+    }
+
+    await this.audit.record({
+      empresaId,
+      atorUsuarioId: usuarioId,
+      acao: 'rascunho_ia_gerado',
+      dadosDepois: {
+        tipo: 'campos_saida_skill',
         agenteId,
         tokensEntrada: response.usage.input_tokens,
         tokensSaida: response.usage.output_tokens,

@@ -1,4 +1,4 @@
-import { UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, UnprocessableEntityException } from '@nestjs/common';
 import { AgenteController } from './agente.controller';
 import type { AgenteService } from './agente.service';
 import type { TenantContext } from '../auth/tenant-context';
@@ -151,5 +151,67 @@ describe('AgenteController', () => {
       UnprocessableEntityException,
     );
     expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it('gera um rascunho de campos de saída de skill a partir do agente e audita', async () => {
+    const service = {
+      findByIdInEmpresa: jest.fn().mockResolvedValue({
+        id: 'agente-1',
+        nome: 'Comprador',
+        funcao: 'Analisar pedidos de compra',
+        objetivo: 'Ajudar o time de compras a triar solicitações',
+        modeloIA: 'claude-sonnet-5',
+      }),
+    } as unknown as AgenteService;
+    const audit = { record: jest.fn() } as unknown as AuditService;
+    const anthropicService = buildAnthropicService({
+      parseStructured: jest.fn().mockResolvedValue({
+        parsed_output: {
+          camposSaida: [
+            { nome: 'fornecedor', tipo: 'string', obrigatorio: true, descricao: 'Nome do fornecedor' },
+            { nome: 'preco', tipo: 'number', obrigatorio: true, descricao: 'Preço cotado' },
+          ],
+        },
+        usage: { input_tokens: 60, output_tokens: 40 },
+      }),
+    });
+    const controller = new AgenteController(service, audit, buildTenantContext(), anthropicService);
+
+    const resultado = await controller.rascunharSkill('modulo-1', 'agente-1', {
+      skillNome: 'Cotação de peças',
+      skillObjetivo: 'Buscar preços de peças agrícolas em fornecedores',
+    });
+
+    expect(service.findByIdInEmpresa).toHaveBeenCalledWith('agente-1', 'empresa-1');
+    expect(anthropicService.parseStructured).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mensagem: expect.stringContaining('Cotação de peças'),
+        model: 'claude-sonnet-5',
+        maxTokens: 2048,
+      }),
+    );
+    expect(audit.record).toHaveBeenCalledWith({
+      empresaId: 'empresa-1',
+      atorUsuarioId: 'usuario-1',
+      acao: 'rascunho_ia_gerado',
+      dadosDepois: { tipo: 'campos_saida_skill', agenteId: 'agente-1', tokensEntrada: 60, tokensSaida: 40 },
+    });
+    expect(resultado).toEqual({
+      camposSaida: [
+        { nome: 'fornecedor', tipo: 'string', obrigatorio: true, descricao: 'Nome do fornecedor' },
+        { nome: 'preco', tipo: 'number', obrigatorio: true, descricao: 'Preço cotado' },
+      ],
+    });
+  });
+
+  it('rejeita rascunho de skill sem objetivo nem brief', async () => {
+    const service = { findByIdInEmpresa: jest.fn() } as unknown as AgenteService;
+    const audit = { record: jest.fn() } as unknown as AuditService;
+    const anthropicService = buildAnthropicService();
+    const controller = new AgenteController(service, audit, buildTenantContext(), anthropicService);
+
+    await expect(controller.rascunharSkill('modulo-1', 'agente-1', {})).rejects.toThrow(BadRequestException);
+    expect(service.findByIdInEmpresa).not.toHaveBeenCalled();
+    expect(anthropicService.parseStructured).not.toHaveBeenCalled();
   });
 });
