@@ -1004,20 +1004,20 @@ export function useCorePilotState(accessToken: string) {
       const primeiraVisivel = conversas.find((c) => !c.arquivada);
       const mensagens = primeiraVisivel ? await listarMensagens(accessToken, primeiraVisivel.id) : [];
 
-      update((s) =>
-        s.moduloConversaId === moduloConversaIdAoIniciar
+      update((s) => ({
+        moduloConversasLoading: false,
+        moduloConversas: conversas,
+        moduloTags: tags,
+        moduloBasesConectadas: basesConectadas,
+        ...(s.moduloConversaId === moduloConversaIdAoIniciar
           ? {
-              moduloConversasLoading: false,
-              moduloConversas: conversas,
-              moduloTags: tags,
-              moduloBasesConectadas: basesConectadas,
               moduloConversaId: primeiraVisivel?.id ?? null,
               moduloMensagens: mensagens,
               moduloActiveTagId: 'all',
               moduloArchiveView: false,
             }
-          : { moduloConversasLoading: false },
-      );
+          : {}),
+      }));
     } catch (err) {
       update({ moduloConversasLoading: false, moduloChatErro: err instanceof Error ? err.message : 'Erro ao carregar conversas' });
     }
@@ -1053,9 +1053,12 @@ export function useCorePilotState(accessToken: string) {
   };
 
   const trocarParaProximaConversaVisivel = (conversaIdRemovida: string) => {
-    const proximaVisivel = state.moduloConversas.find((c) => c.id !== conversaIdRemovida && !c.arquivada);
-    if (proximaVisivel) void selecionarConversaModulo(proximaVisivel.id);
-    else update({ moduloConversaId: null, moduloMensagens: [] });
+    update((s) => {
+      const proximaVisivel = s.moduloConversas.find((c) => c.id !== conversaIdRemovida && !c.arquivada);
+      if (!proximaVisivel) return { moduloConversaId: null, moduloMensagens: [] };
+      void selecionarConversaModulo(proximaVisivel.id);
+      return null;
+    });
   };
 
   const arquivarConversaModulo = async (moduloId: string, conversaId: string) => {
@@ -1179,16 +1182,29 @@ export function useCorePilotState(accessToken: string) {
 
     let respostaAcumulada = '';
     await enviarMensagemStreaming(accessToken, conversaId, texto, {
-      onStatus: (mensagem) => update({ moduloChatStatus: mensagem }),
+      onStatus: (mensagem) =>
+        update((s) => (s.moduloConversaId === conversaId ? { moduloChatStatus: mensagem } : null)),
       onDelta: (delta) => {
         respostaAcumulada += delta;
-        update((s) => ({
-          moduloChatStatus: null,
-          moduloMensagens: s.moduloMensagens.map((m) => (m.id === idAgente ? { ...m, conteudo: respostaAcumulada } : m)),
-        }));
+        update((s) =>
+          s.moduloConversaId === conversaId
+            ? {
+                moduloChatStatus: null,
+                moduloMensagens: s.moduloMensagens.map((m) => (m.id === idAgente ? { ...m, conteudo: respostaAcumulada } : m)),
+              }
+            : null,
+        );
       },
-      onDone: () => update({ moduloChatEnviando: false, moduloChatStatus: null }),
-      onErro: (mensagem) => update({ moduloChatEnviando: false, moduloChatErro: mensagem, moduloChatStatus: null }),
+      onDone: () =>
+        update((s) => ({
+          moduloChatEnviando: false,
+          ...(s.moduloConversaId === conversaId ? { moduloChatStatus: null } : {}),
+        })),
+      onErro: (mensagem) =>
+        update((s) => ({
+          moduloChatEnviando: false,
+          ...(s.moduloConversaId === conversaId ? { moduloChatErro: mensagem, moduloChatStatus: null } : {}),
+        })),
     });
   };
 
