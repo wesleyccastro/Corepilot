@@ -984,6 +984,7 @@ export function useCorePilotState(accessToken: string) {
 
   // --- Chat real do módulo (histórico, organização, bases conectadas) ---
   const carregarConversaDoModulo = async (moduloId: string) => {
+    const moduloConversaIdAoIniciar = state.moduloConversaId;
     update({ moduloConversasLoading: true, moduloChatErro: null });
     try {
       const [conversas, tags, consultas] = await Promise.all([
@@ -1003,16 +1004,20 @@ export function useCorePilotState(accessToken: string) {
       const primeiraVisivel = conversas.find((c) => !c.arquivada);
       const mensagens = primeiraVisivel ? await listarMensagens(accessToken, primeiraVisivel.id) : [];
 
-      update({
-        moduloConversasLoading: false,
-        moduloConversas: conversas,
-        moduloTags: tags,
-        moduloBasesConectadas: basesConectadas,
-        moduloConversaId: primeiraVisivel?.id ?? null,
-        moduloMensagens: mensagens,
-        moduloActiveTagId: 'all',
-        moduloArchiveView: false,
-      });
+      update((s) =>
+        s.moduloConversaId === moduloConversaIdAoIniciar
+          ? {
+              moduloConversasLoading: false,
+              moduloConversas: conversas,
+              moduloTags: tags,
+              moduloBasesConectadas: basesConectadas,
+              moduloConversaId: primeiraVisivel?.id ?? null,
+              moduloMensagens: mensagens,
+              moduloActiveTagId: 'all',
+              moduloArchiveView: false,
+            }
+          : { moduloConversasLoading: false },
+      );
     } catch (err) {
       update({ moduloConversasLoading: false, moduloChatErro: err instanceof Error ? err.message : 'Erro ao carregar conversas' });
     }
