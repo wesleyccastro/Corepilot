@@ -15,13 +15,15 @@ model Empresa {
   logoContentType String?
   criadoEm        DateTime @default(now())
 
-  usuarios      UsuarioEmpresa[]
-  auditLogs     AuditLog[]
-  modulos       Modulo[]
-  conversas     Conversa[]
-  agentes       Agente[]
-  fontesDeDados FonteDeDados[]
-  conversaTags  ConversaTag[]
+  usuarios             UsuarioEmpresa[]
+  auditLogs            AuditLog[]
+  modulos              Modulo[]
+  conversas            Conversa[]
+  agentes              Agente[]
+  fontesDeDados        FonteDeDados[]
+  conversaTags         ConversaTag[]
+  integracaoWhatsapp   IntegracaoWhatsApp?
+  instanciasDeProcesso InstanciaDeProcesso[]
 }
 
 model Usuario {
@@ -31,10 +33,11 @@ model Usuario {
   email          String   @unique
   criadoEm       DateTime @default(now())
 
-  empresas       UsuarioEmpresa[]
-  auditLogs      AuditLog[]
-  conversas      Conversa[]
-  skillExecucoes SkillExecucao[]
+  empresas          UsuarioEmpresa[]
+  auditLogs         AuditLog[]
+  conversas         Conversa[]
+  skillExecucoes    SkillExecucao[]
+  execucoesDeEtapa  ExecucaoDeEtapa[]
 }
 
 enum Perfil {
@@ -86,6 +89,7 @@ model Modulo {
   agentes      Agente[]
   consultas    ConsultaParametrizada[]
   conversaTags ConversaTag[]
+  fluxos       Fluxo[]
 }
 
 model Conversa {
@@ -151,6 +155,7 @@ model Agente {
   empresa Empresa @relation(fields: [empresaId], references: [id])
   modulo  Modulo  @relation(fields: [moduloId], references: [id])
   skills  Skill[]
+  etapas  Etapa[]
 }
 
 model Skill {
@@ -164,6 +169,7 @@ model Skill {
   agente      Agente                  @relation(fields: [agenteId], references: [id])
   execucoes   SkillExecucao[]
   ferramentas ConsultaParametrizada[]
+  etapas      Etapa[]
 }
 
 model SkillExecucao {
@@ -224,4 +230,142 @@ model ConsultaResultado {
   sincronizadoEm          DateTime @default(now())
 
   consulta ConsultaParametrizada @relation(fields: [consultaParametrizadaId], references: [id])
+}
+
+model Fluxo {
+  id        String   @id @default(uuid())
+  moduloId  String
+  versao    Int      @default(1)
+  publicado Boolean  @default(false)
+  criadoEm  DateTime @default(now())
+
+  modulo      Modulo                @relation(fields: [moduloId], references: [id])
+  macroetapas Macroetapa[]
+  etapas      Etapa[]
+  instancias  InstanciaDeProcesso[]
+}
+
+model Macroetapa {
+  id      String @id @default(uuid())
+  fluxoId String
+  nome    String
+  ordem   Int
+
+  fluxo  Fluxo   @relation(fields: [fluxoId], references: [id])
+  etapas Etapa[]
+}
+
+enum TipoEtapa {
+  tarefa_agente
+  interacao_usuario
+  aprovacao
+  decisao_automatica
+  integracao
+  espera
+}
+
+enum ExecutorEtapa {
+  agente
+  usuario
+  agente_mais_usuario
+  integracao
+  agente_mais_integracao
+  automatico
+}
+
+model Etapa {
+  id              String        @id @default(uuid())
+  fluxoId         String
+  macroetapaId    String
+  ordem           Int
+  nome            String
+  tipo            TipoEtapa
+  executor        ExecutorEtapa
+  prazoDias       Int?
+  agenteId        String?
+  skillId         String?
+  autonomia       String?
+  aprovadores     Json          @default("[]")
+  loopParaEtapaId String?
+  entradaRefs     Json          @default("[]")
+  camposUsuario   Json          @default("[]")
+
+  fluxo      Fluxo             @relation(fields: [fluxoId], references: [id])
+  macroetapa Macroetapa        @relation(fields: [macroetapaId], references: [id])
+  agente     Agente?           @relation(fields: [agenteId], references: [id])
+  skill      Skill?            @relation(fields: [skillId], references: [id])
+  execucoes  ExecucaoDeEtapa[]
+}
+
+enum StatusInstancia {
+  em_andamento
+  concluido
+  erro
+}
+
+model InstanciaDeProcesso {
+  id              String          @id @default(uuid())
+  fluxoId         String
+  moduloId        String
+  empresaId       String
+  etapaAtualId    String
+  status          StatusInstancia @default(em_andamento)
+  dadosAcumulados Json            @default("{}")
+  criadoEm        DateTime        @default(now())
+  atualizadoEm    DateTime        @updatedAt
+
+  fluxo     Fluxo             @relation(fields: [fluxoId], references: [id])
+  empresa   Empresa           @relation(fields: [empresaId], references: [id])
+  execucoes ExecucaoDeEtapa[]
+}
+
+enum StatusExecucao {
+  pending
+  processing
+  done
+  failed
+}
+
+enum AtorExecucao {
+  agente
+  usuario
+  integracao
+  automatico
+}
+
+model ExecucaoDeEtapa {
+  id                String         @id @default(uuid())
+  instanciaId       String
+  etapaId           String
+  numeroDaExecucao  Int
+  ator              AtorExecucao
+  atorUsuarioId     String?
+  input             Json
+  output            Json?
+  status            StatusExecucao @default(pending)
+  chaveIdempotencia String?        @unique
+  tokensEntrada     Int?
+  tokensSaida       Int?
+  mensagemErro      String?
+  criadoEm          DateTime       @default(now())
+  concluidoEm       DateTime?
+
+  instancia InstanciaDeProcesso @relation(fields: [instanciaId], references: [id])
+  etapa     Etapa                @relation(fields: [etapaId], references: [id])
+  usuario   Usuario?             @relation(fields: [atorUsuarioId], references: [id])
+}
+
+model IntegracaoWhatsApp {
+  id                  String    @id @default(uuid())
+  empresaId           String    @unique
+  apiUrl              String
+  instanceName        String
+  apiKeyCriptografada String
+  phone               String?
+  ultimoTesteEm       DateTime?
+  ultimoTesteSucesso  Boolean?
+  ultimaMensagemErro  String?
+  criadoEm            DateTime  @default(now())
+
+  empresa Empresa @relation(fields: [empresaId], references: [id])
 }
