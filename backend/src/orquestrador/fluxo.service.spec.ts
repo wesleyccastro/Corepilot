@@ -16,6 +16,7 @@ describe('FluxoService', () => {
         update: jest.fn(),
         delete: jest.fn(),
         findFirst: jest.fn(),
+        findMany: jest.fn(),
       },
       etapa: { create: jest.fn(), update: jest.fn(), count: jest.fn() },
       $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(prisma)),
@@ -162,6 +163,123 @@ describe('FluxoService', () => {
     await expect(
       service.excluirMacroetapa('modulo-1', 'empresa-1', 'me-1'),
     ).rejects.toThrow('Não é possível excluir uma coluna com etapas');
+  });
+
+  it('renumera as macroetapas restantes após excluir uma do início, evitando colisão de ordem na próxima criação', async () => {
+    const { prisma, moduloService } = buildDeps();
+    const fluxo: {
+      id: string;
+      macroetapas: Array<{
+        id: string;
+        fluxoId: string;
+        nome: string;
+        ordem: number;
+      }>;
+      etapas: unknown[];
+    } = {
+      id: 'fluxo-1',
+      macroetapas: [],
+      etapas: [],
+    };
+    const macroetapasDb = new Map<
+      string,
+      { id: string; fluxoId: string; nome: string; ordem: number }
+    >();
+    let proximoId = 1;
+
+    const sincronizarFluxo = () => {
+      fluxo.macroetapas = Array.from(macroetapasDb.values()).sort(
+        (a, b) => a.ordem - b.ordem,
+      );
+    };
+
+    (prisma.fluxo.findFirst as jest.Mock).mockImplementation(() =>
+      Promise.resolve(fluxo),
+    );
+    (prisma.macroetapa.create as jest.Mock).mockImplementation(
+      ({
+        data,
+      }: {
+        data: { fluxoId: string; nome: string; ordem: number };
+      }) => {
+        const registro = {
+          id: `me-${proximoId++}`,
+          fluxoId: data.fluxoId,
+          nome: data.nome,
+          ordem: data.ordem,
+        };
+        macroetapasDb.set(registro.id, registro);
+        sincronizarFluxo();
+        return Promise.resolve(registro);
+      },
+    );
+    (prisma.macroetapa.findFirst as jest.Mock).mockImplementation(
+      ({ where }: { where: { id: string; fluxoId: string } }) => {
+        const registro = macroetapasDb.get(where.id);
+        return Promise.resolve(
+          registro && registro.fluxoId === where.fluxoId ? registro : null,
+        );
+      },
+    );
+    (prisma.macroetapa.findMany as jest.Mock).mockImplementation(
+      ({ where }: { where: { fluxoId: string } }) => {
+        const restantes = Array.from(macroetapasDb.values())
+          .filter((m) => m.fluxoId === where.fluxoId)
+          .sort((a, b) => a.ordem - b.ordem);
+        return Promise.resolve(restantes);
+      },
+    );
+    (prisma.macroetapa.update as jest.Mock).mockImplementation(
+      ({ where, data }: { where: { id: string }; data: { ordem: number } }) => {
+        const registro = macroetapasDb.get(where.id)!;
+        registro.ordem = data.ordem;
+        sincronizarFluxo();
+        return Promise.resolve(registro);
+      },
+    );
+    (prisma.macroetapa.delete as jest.Mock).mockImplementation(
+      ({ where }: { where: { id: string } }) => {
+        const registro = macroetapasDb.get(where.id)!;
+        macroetapasDb.delete(where.id);
+        sincronizarFluxo();
+        return Promise.resolve(registro);
+      },
+    );
+    (prisma.etapa.count as jest.Mock).mockResolvedValue(0);
+    const service = new FluxoService(prisma, moduloService);
+
+    await service.criarMacroetapa('modulo-1', 'empresa-1', { nome: 'Triagem' }); // ordem 0
+    await service.criarMacroetapa('modulo-1', 'empresa-1', { nome: 'Cotação' }); // ordem 1
+    await service.criarMacroetapa('modulo-1', 'empresa-1', {
+      nome: 'Aprovação',
+    }); // ordem 2
+
+    const idOrdemZero = Array.from(macroetapasDb.values()).find(
+      (m) => m.ordem === 0,
+    )!.id;
+    await service.excluirMacroetapa('modulo-1', 'empresa-1', idOrdemZero);
+
+    const restantesOrdenados = Array.from(macroetapasDb.values()).sort(
+      (a, b) => a.ordem - b.ordem,
+    );
+    expect(restantesOrdenados.map((m) => m.ordem)).toEqual([0, 1]);
+    expect(restantesOrdenados.map((m) => m.nome)).toEqual([
+      'Cotação',
+      'Aprovação',
+    ]);
+
+    await service.criarMacroetapa('modulo-1', 'empresa-1', { nome: 'Entrega' });
+
+    const todasAsOrdens = Array.from(macroetapasDb.values()).map(
+      (m) => m.ordem,
+    );
+    expect(new Set(todasAsOrdens).size).toBe(todasAsOrdens.length); // sem colisão
+    expect(
+      macroetapasDb.get(
+        Array.from(macroetapasDb.values()).find((m) => m.nome === 'Entrega')!
+          .id,
+      )!.ordem,
+    ).toBe(2);
   });
 
   it('lança NotFoundException ao editar uma macroetapa de outro fluxo', async () => {

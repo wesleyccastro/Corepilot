@@ -169,6 +169,22 @@ export class FluxoService {
       );
     }
     await this.prisma.macroetapa.delete({ where: { id: macroetapaId } });
+    await this.renumerarMacroetapas(fluxo.id);
+  }
+
+  private async renumerarMacroetapas(fluxoId: string): Promise<void> {
+    const restantes = await this.prisma.macroetapa.findMany({
+      where: { fluxoId },
+      orderBy: { ordem: 'asc' },
+    });
+    await Promise.all(
+      restantes.map((macroetapa, index) =>
+        this.prisma.macroetapa.update({
+          where: { id: macroetapa.id },
+          data: { ordem: index },
+        }),
+      ),
+    );
   }
 
   private async garantirMacroetapaDoFluxo(
