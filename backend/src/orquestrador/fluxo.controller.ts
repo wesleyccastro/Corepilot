@@ -15,6 +15,8 @@ import { TenantContext } from '../auth/tenant-context';
 import { FluxoService } from './fluxo.service';
 import type { CreateMacroetapaDto } from './dto/create-macroetapa.dto';
 import type { UpdateMacroetapaDto } from './dto/update-macroetapa.dto';
+import type { CreateEtapaDto } from './dto/create-etapa.dto';
+import type { UpdateEtapaDto } from './dto/update-etapa.dto';
 
 @Controller('modulos/:moduloId/fluxo')
 @UseGuards(JwtAuthGuard, TenantGuard)
@@ -66,5 +68,38 @@ export class FluxoController {
       empresaId,
       macroetapaId,
     );
+  }
+
+  @Post('etapas')
+  async criarEtapa(
+    @Param('moduloId') moduloId: string,
+    @Body() body: CreateEtapaDto,
+  ) {
+    if (!body.nome?.trim() || !body.tipo || !body.macroetapaId) {
+      throw new BadRequestException(
+        'nome, tipo e macroetapaId são obrigatórios',
+      );
+    }
+    const { empresaId } = this.tenantContext.get();
+    return this.fluxoService.criarEtapa(moduloId, empresaId, body);
+  }
+
+  @Patch('etapas/:etapaId')
+  async atualizarEtapa(
+    @Param('moduloId') moduloId: string,
+    @Param('etapaId') etapaId: string,
+    @Body() body: UpdateEtapaDto,
+  ) {
+    const { empresaId } = this.tenantContext.get();
+    return this.fluxoService.atualizarEtapa(moduloId, empresaId, etapaId, body);
+  }
+
+  @Delete('etapas/:etapaId')
+  async excluirEtapa(
+    @Param('moduloId') moduloId: string,
+    @Param('etapaId') etapaId: string,
+  ) {
+    const { empresaId } = this.tenantContext.get();
+    await this.fluxoService.excluirEtapa(moduloId, empresaId, etapaId);
   }
 }

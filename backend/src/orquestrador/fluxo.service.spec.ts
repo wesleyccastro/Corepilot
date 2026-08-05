@@ -302,3 +302,285 @@ describe('FluxoService', () => {
     ).rejects.toThrow(NotFoundException);
   });
 });
+
+describe('FluxoService — Etapa', () => {
+  function buildDeps() {
+    const prisma = {
+      fluxo: { findFirst: jest.fn(), create: jest.fn() },
+      macroetapa: { findFirst: jest.fn() },
+      etapa: {
+        create: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+        delete: jest.fn(),
+        findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    } as unknown as PrismaService;
+    const moduloService = {
+      findByIdInEmpresa: jest.fn().mockResolvedValue({ id: 'modulo-1' }),
+    } as unknown as ModuloService;
+    return { prisma, moduloService };
+  }
+
+  it('cria uma etapa com o executor padrão do tipo, quando nenhum é informado', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue({
+      id: 'fluxo-1',
+      macroetapas: [{ id: 'me-1' }],
+      etapas: [],
+    });
+    (prisma.macroetapa.findFirst as jest.Mock).mockResolvedValue({
+      id: 'me-1',
+      fluxoId: 'fluxo-1',
+    });
+    (prisma.etapa.create as jest.Mock).mockResolvedValue({ id: 'e-1' });
+    const service = new FluxoService(prisma, moduloService);
+
+    await service.criarEtapa('modulo-1', 'empresa-1', {
+      nome: 'Comprador valida',
+      tipo: 'aprovacao',
+      macroetapaId: 'me-1',
+    });
+
+    expect(prisma.etapa.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ executor: 'usuario' }),
+      }),
+    );
+  });
+
+  it('ignora um executor informado que não é válido pro tipo, usando o padrão', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue({
+      id: 'fluxo-1',
+      macroetapas: [],
+      etapas: [],
+    });
+    (prisma.macroetapa.findFirst as jest.Mock).mockResolvedValue({
+      id: 'me-1',
+      fluxoId: 'fluxo-1',
+    });
+    (prisma.etapa.create as jest.Mock).mockResolvedValue({ id: 'e-1' });
+    const service = new FluxoService(prisma, moduloService);
+
+    await service.criarEtapa('modulo-1', 'empresa-1', {
+      nome: 'X',
+      tipo: 'decisao_automatica',
+      macroetapaId: 'me-1',
+      executor: 'agente',
+    });
+
+    expect(prisma.etapa.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ executor: 'automatico' }),
+      }),
+    );
+  });
+
+  it('trocar o tipo reseta o executor pro padrão do novo tipo, se o atual não for mais válido', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue({
+      id: 'fluxo-1',
+      macroetapas: [],
+      etapas: [],
+    });
+    (prisma.etapa.findFirst as jest.Mock).mockResolvedValue({
+      id: 'e-1',
+      fluxoId: 'fluxo-1',
+      tipo: 'aprovacao',
+      executor: 'usuario',
+      nome: 'X',
+      macroetapaId: 'me-1',
+      prazoDias: null,
+      agenteId: null,
+      skillId: null,
+      autonomia: null,
+      aprovadores: [],
+      loopParaEtapaId: null,
+      entradaRefs: [],
+      camposUsuario: [],
+    });
+    (prisma.etapa.update as jest.Mock).mockResolvedValue({ id: 'e-1' });
+    const service = new FluxoService(prisma, moduloService);
+
+    await service.atualizarEtapa('modulo-1', 'empresa-1', 'e-1', {
+      tipo: 'tarefa_agente',
+    });
+
+    expect(prisma.etapa.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tipo: 'tarefa_agente',
+          executor: 'agente',
+        }),
+      }),
+    );
+  });
+
+  it('excluir uma etapa limpa o loopParaEtapaId de quem apontava pra ela', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue({
+      id: 'fluxo-1',
+      macroetapas: [],
+      etapas: [],
+    });
+    (prisma.etapa.findFirst as jest.Mock).mockResolvedValue({
+      id: 'e-1',
+      fluxoId: 'fluxo-1',
+    });
+    const service = new FluxoService(prisma, moduloService);
+
+    await service.excluirEtapa('modulo-1', 'empresa-1', 'e-1');
+
+    expect(prisma.etapa.updateMany).toHaveBeenCalledWith({
+      where: { fluxoId: 'fluxo-1', loopParaEtapaId: 'e-1' },
+      data: { loopParaEtapaId: null },
+    });
+    expect(prisma.etapa.delete).toHaveBeenCalledWith({
+      where: { id: 'e-1' },
+    });
+  });
+
+  it('renumera as etapas restantes após excluir uma do início, evitando colisão de ordem na próxima criação', async () => {
+    const { moduloService } = buildDeps();
+    const fluxo: {
+      id: string;
+      macroetapas: Array<{ id: string; fluxoId: string }>;
+      etapas: Array<{
+        id: string;
+        fluxoId: string;
+        nome: string;
+        ordem: number;
+      }>;
+    } = {
+      id: 'fluxo-1',
+      macroetapas: [{ id: 'me-1', fluxoId: 'fluxo-1' }],
+      etapas: [],
+    };
+    const etapasDb = new Map<
+      string,
+      { id: string; fluxoId: string; nome: string; ordem: number }
+    >();
+    let proximoId = 1;
+
+    const sincronizarFluxo = () => {
+      fluxo.etapas = Array.from(etapasDb.values()).sort(
+        (a, b) => a.ordem - b.ordem,
+      );
+    };
+
+    const prisma = {
+      fluxo: { findFirst: jest.fn(() => Promise.resolve(fluxo)) },
+      macroetapa: {
+        findFirst: jest.fn(
+          ({ where }: { where: { id: string; fluxoId: string } }) =>
+            Promise.resolve(
+              fluxo.macroetapas.find(
+                (m) => m.id === where.id && m.fluxoId === where.fluxoId,
+              ) ?? null,
+            ),
+        ),
+      },
+      etapa: {
+        create: jest.fn(
+          ({
+            data,
+          }: {
+            data: { fluxoId: string; nome: string; ordem: number };
+          }) => {
+            const registro = {
+              id: `e-${proximoId++}`,
+              fluxoId: data.fluxoId,
+              nome: data.nome,
+              ordem: data.ordem,
+            };
+            etapasDb.set(registro.id, registro);
+            sincronizarFluxo();
+            return Promise.resolve(registro);
+          },
+        ),
+        findFirst: jest.fn(
+          ({ where }: { where: { id: string; fluxoId: string } }) => {
+            const registro = etapasDb.get(where.id);
+            return Promise.resolve(
+              registro && registro.fluxoId === where.fluxoId ? registro : null,
+            );
+          },
+        ),
+        findMany: jest.fn(({ where }: { where: { fluxoId: string } }) => {
+          const restantes = Array.from(etapasDb.values())
+            .filter((e) => e.fluxoId === where.fluxoId)
+            .sort((a, b) => a.ordem - b.ordem);
+          return Promise.resolve(restantes);
+        }),
+        update: jest.fn(
+          ({
+            where,
+            data,
+          }: {
+            where: { id: string };
+            data: { ordem: number };
+          }) => {
+            const registro = etapasDb.get(where.id)!;
+            registro.ordem = data.ordem;
+            sincronizarFluxo();
+            return Promise.resolve(registro);
+          },
+        ),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        delete: jest.fn(({ where }: { where: { id: string } }) => {
+          const registro = etapasDb.get(where.id)!;
+          etapasDb.delete(where.id);
+          sincronizarFluxo();
+          return Promise.resolve(registro);
+        }),
+      },
+    } as unknown as PrismaService;
+    const service = new FluxoService(prisma, moduloService);
+
+    await service.criarEtapa('modulo-1', 'empresa-1', {
+      nome: 'Triagem',
+      tipo: 'decisao_automatica',
+      macroetapaId: 'me-1',
+    }); // ordem 0
+    await service.criarEtapa('modulo-1', 'empresa-1', {
+      nome: 'Cotação',
+      tipo: 'decisao_automatica',
+      macroetapaId: 'me-1',
+    }); // ordem 1
+    await service.criarEtapa('modulo-1', 'empresa-1', {
+      nome: 'Aprovação',
+      tipo: 'decisao_automatica',
+      macroetapaId: 'me-1',
+    }); // ordem 2
+
+    const idOrdemZero = Array.from(etapasDb.values()).find(
+      (e) => e.ordem === 0,
+    )!.id;
+    await service.excluirEtapa('modulo-1', 'empresa-1', idOrdemZero);
+
+    const restantesOrdenados = Array.from(etapasDb.values()).sort(
+      (a, b) => a.ordem - b.ordem,
+    );
+    expect(restantesOrdenados.map((e) => e.ordem)).toEqual([0, 1]);
+    expect(restantesOrdenados.map((e) => e.nome)).toEqual([
+      'Cotação',
+      'Aprovação',
+    ]);
+
+    await service.criarEtapa('modulo-1', 'empresa-1', {
+      nome: 'Entrega',
+      tipo: 'decisao_automatica',
+      macroetapaId: 'me-1',
+    });
+
+    const todasAsOrdens = Array.from(etapasDb.values()).map((e) => e.ordem);
+    expect(new Set(todasAsOrdens).size).toBe(todasAsOrdens.length); // sem colisão
+    expect(
+      etapasDb.get(
+        Array.from(etapasDb.values()).find((e) => e.nome === 'Entrega')!.id,
+      )!.ordem,
+    ).toBe(2);
+  });
+});

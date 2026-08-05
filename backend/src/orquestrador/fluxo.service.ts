@@ -8,6 +8,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ModuloService } from '../modulo/modulo.service';
 import type { CreateMacroetapaDto } from './dto/create-macroetapa.dto';
 import type { UpdateMacroetapaDto } from './dto/update-macroetapa.dto';
+import { executorPadrao, executorValido } from './tipo-executor';
+import type { CreateEtapaDto } from './dto/create-etapa.dto';
+import type { UpdateEtapaDto } from './dto/update-etapa.dto';
 
 type FluxoComRelacoes = Fluxo & { macroetapas: Macroetapa[]; etapas: Etapa[] };
 
@@ -199,5 +202,117 @@ export class FluxoService {
         'Coluna do Kanban não encontrada neste fluxo',
       );
     }
+  }
+
+  async criarEtapa(moduloId: string, empresaId: string, dto: CreateEtapaDto) {
+    const fluxo = await this.getOrCreateRascunho(moduloId, empresaId);
+    await this.garantirMacroetapaDoFluxo(fluxo.id, dto.macroetapaId);
+    const executor =
+      dto.executor && executorValido(dto.tipo, dto.executor)
+        ? dto.executor
+        : executorPadrao(dto.tipo);
+
+    return this.prisma.etapa.create({
+      data: {
+        fluxoId: fluxo.id,
+        macroetapaId: dto.macroetapaId,
+        ordem: fluxo.etapas.length,
+        nome: dto.nome,
+        tipo: dto.tipo,
+        executor,
+        aprovadores: [],
+        entradaRefs: [],
+        camposUsuario: [],
+      },
+    });
+  }
+
+  async atualizarEtapa(
+    moduloId: string,
+    empresaId: string,
+    etapaId: string,
+    dto: UpdateEtapaDto,
+  ) {
+    const fluxo = await this.getOrCreateRascunho(moduloId, empresaId);
+    const etapaAtual = await this.garantirEtapaDoFluxo(fluxo.id, etapaId);
+    if (dto.macroetapaId)
+      await this.garantirMacroetapaDoFluxo(fluxo.id, dto.macroetapaId);
+
+    const tipo = dto.tipo ?? etapaAtual.tipo;
+    let executor = dto.executor ?? etapaAtual.executor;
+    if (!executorValido(tipo, executor)) executor = executorPadrao(tipo);
+
+    return this.prisma.etapa.update({
+      where: { id: etapaId },
+      data: {
+        nome: dto.nome ?? etapaAtual.nome,
+        tipo,
+        executor,
+        macroetapaId: dto.macroetapaId ?? etapaAtual.macroetapaId,
+        prazoDias:
+          dto.prazoDias === undefined ? etapaAtual.prazoDias : dto.prazoDias,
+        agenteId:
+          dto.agenteId === undefined ? etapaAtual.agenteId : dto.agenteId,
+        skillId: dto.skillId === undefined ? etapaAtual.skillId : dto.skillId,
+        autonomia:
+          dto.autonomia === undefined ? etapaAtual.autonomia : dto.autonomia,
+        aprovadores:
+          dto.aprovadores === undefined
+            ? (etapaAtual.aprovadores as Prisma.InputJsonValue)
+            : (dto.aprovadores as unknown as Prisma.InputJsonValue),
+        loopParaEtapaId:
+          dto.loopParaEtapaId === undefined
+            ? etapaAtual.loopParaEtapaId
+            : dto.loopParaEtapaId,
+        entradaRefs:
+          dto.entradaRefs === undefined
+            ? (etapaAtual.entradaRefs as Prisma.InputJsonValue)
+            : (dto.entradaRefs as unknown as Prisma.InputJsonValue),
+        camposUsuario:
+          dto.camposUsuario === undefined
+            ? (etapaAtual.camposUsuario as Prisma.InputJsonValue)
+            : (dto.camposUsuario as unknown as Prisma.InputJsonValue),
+      },
+    });
+  }
+
+  async excluirEtapa(
+    moduloId: string,
+    empresaId: string,
+    etapaId: string,
+  ): Promise<void> {
+    const fluxo = await this.getOrCreateRascunho(moduloId, empresaId);
+    await this.garantirEtapaDoFluxo(fluxo.id, etapaId);
+    await this.prisma.etapa.updateMany({
+      where: { fluxoId: fluxo.id, loopParaEtapaId: etapaId },
+      data: { loopParaEtapaId: null },
+    });
+    await this.prisma.etapa.delete({ where: { id: etapaId } });
+    await this.renumerarEtapas(fluxo.id);
+  }
+
+  private async renumerarEtapas(fluxoId: string): Promise<void> {
+    const restantes = await this.prisma.etapa.findMany({
+      where: { fluxoId },
+      orderBy: { ordem: 'asc' },
+    });
+    await Promise.all(
+      restantes.map((etapa, index) =>
+        this.prisma.etapa.update({
+          where: { id: etapa.id },
+          data: { ordem: index },
+        }),
+      ),
+    );
+  }
+
+  private async garantirEtapaDoFluxo(fluxoId: string, etapaId: string) {
+    const etapa = await this.prisma.etapa.findFirst({
+      where: { id: etapaId, fluxoId },
+    });
+    if (!etapa) {
+      throw new NotFoundException('Etapa não encontrada neste fluxo');
+    }
+    return etapa;
   }
 }
