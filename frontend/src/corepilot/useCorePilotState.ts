@@ -47,8 +47,8 @@ import {
   listarMensagens,
 } from './modulos/chatStream';
 import { criarTag, listarTags, removerTag } from './modulos/tags-api';
-import { emptyEditFonteForm, emptyNovaConsultaForm, emptyNovaFonteForm, emptyNovoAgenteForm } from './types';
-import type { CampoSaida, Skill as SkillReal } from './agentes/types';
+import { emptyAgentIdentityForm, emptyEditFonteForm, emptyNovaConsultaForm, emptyNovaFonteForm, emptyNovoAgenteForm, type AgentIdentityForm } from './types';
+import type { Agente, CampoSaida, Skill as SkillReal } from './agentes/types';
 import type { Consulta } from './consultas/types';
 
 type Patch = Partial<CorePilotState> | ((s: CorePilotState) => Partial<CorePilotState> | null);
@@ -736,6 +736,13 @@ export function useCorePilotState(accessToken: string) {
   };
 
   // --- Agentes reais ---
+  const agenteParaIdentityForm = (agente: Agente): AgentIdentityForm => ({
+    nome: agente.nome,
+    funcao: agente.funcao,
+    objetivo: agente.objetivo,
+    guardrails: agente.guardrails ?? '',
+    regraEscalonamento: agente.regraEscalonamento ?? '',
+  });
   const carregarAgentesDoModulo = async (moduloId: string) => {
     update({ agentesLoading: true });
     try {
@@ -744,6 +751,7 @@ export function useCorePilotState(accessToken: string) {
         agentesLoading: false,
         moduloAgentes: agentes,
         selectedAgenteId: agentes[0]?.id ?? null,
+        agentIdentityForm: agentes[0] ? agenteParaIdentityForm(agentes[0]) : { ...emptyAgentIdentityForm },
       });
       if (agentes[0]) await carregarSkillsDoAgente(agentes[0].id);
     } catch (err) {
@@ -751,7 +759,8 @@ export function useCorePilotState(accessToken: string) {
     }
   };
   const selecionarAgente = (agenteId: string) => {
-    update({ selectedAgenteId: agenteId });
+    const agente = state.moduloAgentes.find((a) => a.id === agenteId);
+    update({ selectedAgenteId: agenteId, agentIdentityForm: agente ? agenteParaIdentityForm(agente) : { ...emptyAgentIdentityForm } });
     void carregarSkillsDoAgente(agenteId);
   };
   const toggleNovoAgenteForm = () => update((s) => ({ showNovoAgenteForm: !s.showNovoAgenteForm, novoAgenteForm: { ...emptyNovoAgenteForm } }));
@@ -769,6 +778,7 @@ export function useCorePilotState(accessToken: string) {
         wizardSaving: false,
         moduloAgentes: [agente, ...s.moduloAgentes],
         selectedAgenteId: agente.id,
+        agentIdentityForm: agenteParaIdentityForm(agente),
         showNovoAgenteForm: false,
         novoAgenteForm: { ...emptyNovoAgenteForm },
         agenteSkills: [],
@@ -778,31 +788,24 @@ export function useCorePilotState(accessToken: string) {
       update({ wizardSaving: false, wizardError: err instanceof Error ? err.message : 'Erro ao criar agente' });
     }
   };
-  const atualizarAgenteReal = async (campo: 'nome' | 'funcao' | 'objetivo' | 'guardrails' | 'regraEscalonamento', valor: string) => {
-    const moduloId = state.currentModuloId;
-    const agenteId = state.selectedAgenteId;
-    if (!moduloId || !agenteId) return;
-    try {
-      const agente = await atualizarAgente(accessToken, moduloId, agenteId, { [campo]: valor });
-      update((s) => ({ moduloAgentes: s.moduloAgentes.map((a) => (a.id === agenteId ? agente : a)) }));
-    } catch (err) {
-      update({ wizardError: err instanceof Error ? err.message : 'Erro ao atualizar agente' });
-    }
+  const updateAgentIdentityField = (field: keyof AgentIdentityForm) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    update((s) => ({ agentIdentityForm: { ...s.agentIdentityForm, [field]: val } }));
   };
-  const salvarIdentidadeAgenteReal = async (dados: {
-    nome: string;
-    funcao: string;
-    objetivo: string;
-    guardrails: string;
-    regraEscalonamento: string;
-  }) => {
+  const setAgentIdentityField = (field: keyof AgentIdentityForm, valor: string) =>
+    update((s) => ({ agentIdentityForm: { ...s.agentIdentityForm, [field]: valor } }));
+  const salvarIdentidadeAgenteReal = async () => {
     const moduloId = state.currentModuloId;
     const agenteId = state.selectedAgenteId;
     if (!moduloId || !agenteId) return;
     update({ wizardSaving: true, wizardError: null });
     try {
-      const agente = await atualizarAgente(accessToken, moduloId, agenteId, dados);
-      update((s) => ({ wizardSaving: false, moduloAgentes: s.moduloAgentes.map((a) => (a.id === agenteId ? agente : a)) }));
+      const agente = await atualizarAgente(accessToken, moduloId, agenteId, state.agentIdentityForm);
+      update((s) => ({
+        wizardSaving: false,
+        moduloAgentes: s.moduloAgentes.map((a) => (a.id === agenteId ? agente : a)),
+        agentIdentityForm: agenteParaIdentityForm(agente),
+      }));
     } catch (err) {
       update({ wizardSaving: false, wizardError: err instanceof Error ? err.message : 'Erro ao salvar agente' });
     }
@@ -1316,8 +1319,8 @@ export function useCorePilotState(accessToken: string) {
     toggleNewUserForm, updateNewUserField, toggleNewUserProfile, saveNewUser,
     chatListKeyFor,
 
-    carregarAgentesDoModulo, selecionarAgente, toggleNovoAgenteForm, updateNovoAgenteField, criarNovoAgenteReal, atualizarAgenteReal,
-    salvarIdentidadeAgenteReal,
+    carregarAgentesDoModulo, selecionarAgente, toggleNovoAgenteForm, updateNovoAgenteField, criarNovoAgenteReal,
+    updateAgentIdentityField, setAgentIdentityField, salvarIdentidadeAgenteReal,
     gerarRascunhoInstrucoesModulo, gerarRascunhoGuardrailsAgente, gerarRascunhoSkill,
     carregarSkillsDoAgente, abrirNovaSkill, abrirEdicaoSkill, cancelarEdicaoSkill, updateSkillFormNome, updateSkillFormObjetivo,
     adicionarCampoSaida, atualizarCampoSaida, removerCampoSaida, toggleFerramentaSkill, salvarSkillReal,

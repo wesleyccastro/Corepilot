@@ -1,34 +1,13 @@
-import { useEffect, useState } from 'react';
 import type { CorePilotState } from '../../../initialState';
 import type { CorePilotActions } from '../../../useCorePilotState';
-import { btnDark, colors, input, label } from '../../../styles';
+import { colors, input, label } from '../../../styles';
 import { GerarRascunhoButton } from '../../../components/GerarRascunhoButton';
 
 export function AgentIdentityTab({ state, actions }: { state: CorePilotState; actions: CorePilotActions }) {
   const agente = state.moduloAgentes.find((a) => a.id === state.selectedAgenteId);
-  const [nome, setNome] = useState(agente?.nome ?? '');
-  const [funcao, setFuncao] = useState(agente?.funcao ?? '');
-  const [objetivo, setObjetivo] = useState(agente?.objetivo ?? '');
-  const [guardrails, setGuardrails] = useState(agente?.guardrails ?? '');
-  const [regraEscalonamento, setRegraEscalonamento] = useState(agente?.regraEscalonamento ?? '');
-
-  useEffect(() => {
-    setNome(agente?.nome ?? '');
-    setFuncao(agente?.funcao ?? '');
-    setObjetivo(agente?.objetivo ?? '');
-    setGuardrails(agente?.guardrails ?? '');
-    setRegraEscalonamento(agente?.regraEscalonamento ?? '');
-    // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [agente?.id]);
+  const form = state.agentIdentityForm;
 
   if (!agente) return null;
-
-  const alterado =
-    nome !== agente.nome ||
-    funcao !== agente.funcao ||
-    objetivo !== agente.objetivo ||
-    guardrails !== (agente.guardrails ?? '') ||
-    regraEscalonamento !== (agente.regraEscalonamento ?? '');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 560 }}>
@@ -36,9 +15,8 @@ export function AgentIdentityTab({ state, actions }: { state: CorePilotState; ac
         <label style={label}>Nome do agente</label>
         <input
           type="text"
-          value={nome}
-          onChange={(e) => setNome(e.target.value)}
-          onBlur={() => nome !== agente.nome && void actions.atualizarAgenteReal('nome', nome)}
+          value={form.nome}
+          onChange={actions.updateAgentIdentityField('nome')}
           style={{ ...input, width: '100%' }}
         />
       </div>
@@ -46,9 +24,8 @@ export function AgentIdentityTab({ state, actions }: { state: CorePilotState; ac
         <label style={label}>Função</label>
         <textarea
           rows={2}
-          value={funcao}
-          onChange={(e) => setFuncao(e.target.value)}
-          onBlur={() => funcao !== agente.funcao && void actions.atualizarAgenteReal('funcao', funcao)}
+          value={form.funcao}
+          onChange={actions.updateAgentIdentityField('funcao')}
           style={{ ...input, width: '100%', resize: 'vertical' }}
         />
       </div>
@@ -56,9 +33,8 @@ export function AgentIdentityTab({ state, actions }: { state: CorePilotState; ac
         <label style={label}>Objetivo</label>
         <textarea
           rows={2}
-          value={objetivo}
-          onChange={(e) => setObjetivo(e.target.value)}
-          onBlur={() => objetivo !== agente.objetivo && void actions.atualizarAgenteReal('objetivo', objetivo)}
+          value={form.objetivo}
+          onChange={actions.updateAgentIdentityField('objetivo')}
           style={{ ...input, width: '100%', resize: 'vertical' }}
         />
       </div>
@@ -66,8 +42,8 @@ export function AgentIdentityTab({ state, actions }: { state: CorePilotState; ac
         <GerarRascunhoButton
           onGerar={async (brief) => {
             const rascunho = await actions.gerarRascunhoGuardrailsAgente(agente.id, brief);
-            setGuardrails(rascunho.guardrails);
-            setRegraEscalonamento(rascunho.regraEscalonamento);
+            actions.setAgentIdentityField('guardrails', rascunho.guardrails);
+            actions.setAgentIdentityField('regraEscalonamento', rascunho.regraEscalonamento);
           }}
         />
       </div>
@@ -75,9 +51,8 @@ export function AgentIdentityTab({ state, actions }: { state: CorePilotState; ac
         <label style={label}>Restrições (o que este agente NUNCA deve fazer)</label>
         <textarea
           rows={3}
-          value={guardrails}
-          onChange={(e) => setGuardrails(e.target.value)}
-          onBlur={() => guardrails !== (agente.guardrails ?? '') && void actions.atualizarAgenteReal('guardrails', guardrails)}
+          value={form.guardrails}
+          onChange={actions.updateAgentIdentityField('guardrails')}
           placeholder="Ex.: nunca aprovar ou fechar uma compra sozinho; nunca inventar preço sem fonte."
           style={{ ...input, width: '100%', resize: 'vertical' }}
         />
@@ -86,9 +61,8 @@ export function AgentIdentityTab({ state, actions }: { state: CorePilotState; ac
         <label style={label}>Quando escalar para um humano</label>
         <textarea
           rows={3}
-          value={regraEscalonamento}
-          onChange={(e) => setRegraEscalonamento(e.target.value)}
-          onBlur={() => regraEscalonamento !== (agente.regraEscalonamento ?? '') && void actions.atualizarAgenteReal('regraEscalonamento', regraEscalonamento)}
+          value={form.regraEscalonamento}
+          onChange={actions.updateAgentIdentityField('regraEscalonamento')}
           placeholder="Ex.: se não encontrar 3 fornecedores confiáveis, ou se o preço variar mais de 40% entre fontes."
           style={{ ...input, width: '100%', resize: 'vertical' }}
         />
@@ -100,20 +74,6 @@ export function AgentIdentityTab({ state, actions }: { state: CorePilotState; ac
           <div style={{ fontSize: 10.5, color: colors.teal, fontWeight: 700 }}>Único suportado nesta versão</div>
         </div>
         <div style={{ fontSize: 12, color: colors.textFaint, marginTop: 8 }}>O CorePilot é otimizado e roda exclusivamente com Claude.</div>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <button
-          onClick={() => void actions.salvarIdentidadeAgenteReal({ nome, funcao, objetivo, guardrails, regraEscalonamento })}
-          disabled={state.wizardSaving || !alterado}
-          style={{ ...btnDark, opacity: state.wizardSaving || !alterado ? 0.6 : 1 }}
-        >
-          {state.wizardSaving ? 'Salvando…' : 'Salvar'}
-        </button>
-        {alterado && !state.wizardSaving && (
-          <span style={{ fontSize: 12, color: colors.warnText, fontWeight: 600 }}>
-            Alterações não salvas — mudar de aba ou de agente descarta o que não foi salvo.
-          </span>
-        )}
       </div>
     </div>
   );

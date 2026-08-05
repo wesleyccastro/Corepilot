@@ -31,10 +31,12 @@ import type { FonteDeDados } from './fontes-de-dados/types';
 import type { Consulta, ResultadoTeste } from './consultas/types';
 import type { Conversa, ConversaTag, Mensagem, Modulo } from './modulos/types';
 import {
+  emptyAgentIdentityForm,
   emptyEditFonteForm,
   emptyNovaConsultaForm,
   emptyNovaFonteForm,
   emptyNovoAgenteForm,
+  type AgentIdentityForm,
   type EditFonteForm,
   type NovaConsultaForm,
   type NovaFonteForm,
@@ -168,6 +170,7 @@ export interface CorePilotState {
   selectedAgenteId: string | null;
   novoAgenteForm: NovoAgenteForm;
   showNovoAgenteForm: boolean;
+  agentIdentityForm: AgentIdentityForm;
 
   agenteSkills: SkillReal[];
   skillsLoading: boolean;
@@ -434,6 +437,7 @@ export function createInitialState(): CorePilotState {
     selectedAgenteId: null,
     novoAgenteForm: { ...emptyNovoAgenteForm },
     showNovoAgenteForm: false,
+    agentIdentityForm: { ...emptyAgentIdentityForm },
 
     agenteSkills: [],
     skillsLoading: false,

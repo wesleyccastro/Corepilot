@@ -323,6 +323,22 @@ export interface NovoAgenteForm {
 
 export const emptyNovoAgenteForm: NovoAgenteForm = { nome: '', funcao: '', objetivo: '' };
 
+export interface AgentIdentityForm {
+  nome: string;
+  funcao: string;
+  objetivo: string;
+  guardrails: string;
+  regraEscalonamento: string;
+}
+
+export const emptyAgentIdentityForm: AgentIdentityForm = {
+  nome: '',
+  funcao: '',
+  objetivo: '',
+  guardrails: '',
+  regraEscalonamento: '',
+};
+
 export interface NovaFonteForm {
   tipo: string;
   nome: string;

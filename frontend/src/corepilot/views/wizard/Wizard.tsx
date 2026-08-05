@@ -19,6 +19,14 @@ const stepDefs = [
 
 export function Wizard({ state, actions }: { state: CorePilotState; actions: CorePilotActions }) {
   const isEditing = !!state.editingModule;
+  const agenteAtual = state.moduloAgentes.find((a) => a.id === state.selectedAgenteId);
+  const identidadeAgenteAlterada =
+    !!agenteAtual &&
+    (state.agentIdentityForm.nome !== agenteAtual.nome ||
+      state.agentIdentityForm.funcao !== agenteAtual.funcao ||
+      state.agentIdentityForm.objetivo !== agenteAtual.objetivo ||
+      state.agentIdentityForm.guardrails !== (agenteAtual.guardrails ?? '') ||
+      state.agentIdentityForm.regraEscalonamento !== (agenteAtual.regraEscalonamento ?? ''));
 
   return (
     <div style={{ maxWidth: 1240, margin: '0 auto', padding: '28px 24px 90px', display: 'grid', gridTemplateColumns: '220px 1fr', gap: 32 }}>
@@ -66,15 +74,29 @@ export function Wizard({ state, actions }: { state: CorePilotState; actions: Cor
         {state.wizardStep === 5 && <Step5Permissions state={state} actions={actions} />}
         {state.wizardStep === 6 && <Step6Review state={state} actions={actions} />}
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20 }}>
           {state.wizardStep > 1 ? (
             <button onClick={actions.prevStep} style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '10px 18px', fontSize: 13.5, fontWeight: 600, color: colors.navy, cursor: 'pointer' }}>Voltar</button>
           ) : <span />}
-          {state.wizardStep < 6 && (
-            <button onClick={actions.nextStep} disabled={state.wizardSaving} style={{ background: colors.navy, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>
-              {state.wizardSaving ? 'Salvando…' : 'Continuar'}
-            </button>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {identidadeAgenteAlterada && !state.wizardSaving && (
+              <span style={{ fontSize: 12, color: colors.warnText, fontWeight: 600 }}>Alterações não salvas no agente</span>
+            )}
+            {state.wizardStep === 4 && agenteAtual && (
+              <button
+                onClick={() => void actions.salvarIdentidadeAgenteReal()}
+                disabled={state.wizardSaving || !identidadeAgenteAlterada}
+                style={{ background: '#fff', border: `1px solid ${colors.teal}`, borderRadius: 8, padding: '10px 18px', fontSize: 13.5, fontWeight: 700, color: colors.teal, cursor: 'pointer', opacity: state.wizardSaving || !identidadeAgenteAlterada ? 0.5 : 1 }}
+              >
+                {state.wizardSaving ? 'Salvando…' : 'Salvar'}
+              </button>
+            )}
+            {state.wizardStep < 6 && (
+              <button onClick={actions.nextStep} disabled={state.wizardSaving} style={{ background: colors.navy, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>
+                {state.wizardSaving ? 'Salvando…' : 'Continuar'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
