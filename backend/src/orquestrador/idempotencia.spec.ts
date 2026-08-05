@@ -6,6 +6,8 @@ describe('chaveIdempotencia', () => {
   });
 
   it('gera chaves diferentes pra reexecuções da mesma etapa (loop)', () => {
-    expect(chaveIdempotencia('inst-1', 'etapa-1', 1)).not.toBe(chaveIdempotencia('inst-1', 'etapa-1', 2));
+    expect(chaveIdempotencia('inst-1', 'etapa-1', 1)).not.toBe(
+      chaveIdempotencia('inst-1', 'etapa-1', 2),
+    );
   });
 });

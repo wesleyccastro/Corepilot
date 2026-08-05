@@ -1,12 +1,32 @@
 export type TipoCampoEtapa =
-  | 'text' | 'number' | 'date' | 'select' | 'checkbox' | 'attachment'
-  | 'entity-reference' | 'table' | 'reference-table' | 'summary';
+  | 'text'
+  | 'number'
+  | 'date'
+  | 'select'
+  | 'checkbox'
+  | 'attachment'
+  | 'entity-reference'
+  | 'table'
+  | 'reference-table'
+  | 'summary';
 
 export interface TableColumn {
   id: string;
   label: string;
-  tipo: 'text' | 'checkbox' | 'date' | 'datetime' | 'number' | 'select' | 'calculated';
-  calc?: { operation: 'multiply' | 'add' | 'subtract' | 'divide'; column1Id: string; column2Id: string; format?: string };
+  tipo:
+    | 'text'
+    | 'checkbox'
+    | 'date'
+    | 'datetime'
+    | 'number'
+    | 'select'
+    | 'calculated';
+  calc?: {
+    operation: 'multiply' | 'add' | 'subtract' | 'divide';
+    column1Id: string;
+    column2Id: string;
+    format?: string;
+  };
 }
 
 export interface CustomFieldEtapa {

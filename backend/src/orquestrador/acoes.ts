@@ -13,22 +13,43 @@ export interface EtapaParaAcoes {
   loopParaEtapaId: string | null;
 }
 
-export function calcularAcoes(etapa: EtapaParaAcoes, proximaEtapaId: string | null): AcaoEtapa[] {
+export function calcularAcoes(
+  etapa: EtapaParaAcoes,
+  proximaEtapaId: string | null,
+): AcaoEtapa[] {
   if (etapa.tipo === 'aprovacao') {
-    const acoes: AcaoEtapa[] = [{ id: 'aprovar', label: 'Aprovar', etapaDestinoId: proximaEtapaId, estilo: 'primario' }];
+    const acoes: AcaoEtapa[] = [
+      {
+        id: 'aprovar',
+        label: 'Aprovar',
+        etapaDestinoId: proximaEtapaId,
+        estilo: 'primario',
+      },
+    ];
     if (etapa.loopParaEtapaId) {
       acoes.push({
         id: 'solicitar_ajustes',
         label: 'Solicitar ajustes',
         etapaDestinoId: etapa.loopParaEtapaId,
-        exigeCampo: { key: 'motivo_correcao', label: 'Motivo da correção', obrigatorio: true },
+        exigeCampo: {
+          key: 'motivo_correcao',
+          label: 'Motivo da correção',
+          obrigatorio: true,
+        },
         estilo: 'secundario',
       });
     }
     return acoes;
   }
   if (etapa.tipo === 'interacao_usuario') {
-    return [{ id: 'concluir', label: 'Concluir', etapaDestinoId: proximaEtapaId, estilo: 'primario' }];
+    return [
+      {
+        id: 'concluir',
+        label: 'Concluir',
+        etapaDestinoId: proximaEtapaId,
+        estilo: 'primario',
+      },
+    ];
   }
   return [];
 }
