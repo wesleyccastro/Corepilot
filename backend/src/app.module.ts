@@ -16,6 +16,7 @@ import { ConsultaModule } from './consulta/consulta.module';
 import { ConsultaTesteModule } from './consulta/consulta-teste.module';
 import { SyncCronModule } from './consulta/sync-cron.module';
 import { FerramentaModule } from './skill/ferramenta.module';
+import { OrquestradorModule } from './orquestrador/orquestrador.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { FerramentaModule } from './skill/ferramenta.module';
     ConsultaTesteModule,
     SyncCronModule,
     FerramentaModule,
+    OrquestradorModule,
   ],
   controllers: [AppController],
   providers: [AppService],
