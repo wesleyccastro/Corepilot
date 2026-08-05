@@ -120,23 +120,30 @@ export class OrquestradorEngineService {
     const concluiImediatamente =
       etapa.tipo === 'decisao_automatica' || etapa.tipo === 'espera';
 
-    await this.prisma.execucaoDeEtapa.create({
-      data: {
-        instanciaId,
-        etapaId: etapa.id,
-        numeroDaExecucao,
-        ator: atorParaExecutor(etapa.executor),
-        input: {},
-        status: concluiImediatamente ? 'done' : 'pending',
-        chaveIdempotencia: chaveIdempotencia(
+    // execucaoDeEtapa.create (+ eventual atualização de status da instância que
+    // viesse a se juntar aqui) precisa ser atômico: uma execução gravada sem a
+    // instância refletir o mesmo estado deixaria os dois dessincronizados.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.execucaoDeEtapa.create({
+        data: {
           instanciaId,
-          etapa.id,
+          etapaId: etapa.id,
           numeroDaExecucao,
-        ),
-        concluidoEm: concluiImediatamente ? new Date() : null,
-      },
+          ator: atorParaExecutor(etapa.executor),
+          input: {},
+          status: concluiImediatamente ? 'done' : 'pending',
+          chaveIdempotencia: chaveIdempotencia(
+            instanciaId,
+            etapa.id,
+            numeroDaExecucao,
+          ),
+          concluidoEm: concluiImediatamente ? new Date() : null,
+        },
+      });
     });
 
+    // Passo lógico separado (avança para a etapa seguinte) — fica fora da
+    // transação acima para não aninhar transações.
     if (concluiImediatamente) {
       await this.avancar(instanciaId, etapa.id);
     }
@@ -199,45 +206,51 @@ export class OrquestradorEngineService {
       (await this.prisma.execucaoDeEtapa.count({
         where: { instanciaId, etapaId: etapaAtual.id },
       })) + 1;
-    await this.prisma.execucaoDeEtapa.create({
-      data: {
-        instanciaId,
-        etapaId: etapaAtual.id,
-        numeroDaExecucao,
-        ator: 'usuario',
-        atorUsuarioId,
-        input: dadosFormulario as Prisma.InputJsonValue,
-        output: dadosFormulario as Prisma.InputJsonValue,
-        status: 'done',
-        concluidoEm: new Date(),
-        chaveIdempotencia: chaveIdempotencia(
-          instanciaId,
-          etapaAtual.id,
-          numeroDaExecucao,
-        ),
-      },
-    });
-
     const dadosAcumulados = {
       ...(instancia.dadosAcumulados as Record<string, unknown>),
       [etapaAtual.id]: dadosFormulario,
     };
-    await this.prisma.instanciaDeProcesso.update({
-      where: { id: instanciaId },
-      data: { dadosAcumulados: dadosAcumulados as Prisma.InputJsonValue },
+
+    // Registrar a ação humana + atualizar dadosAcumulados + mover a instância
+    // (ou concluí-la) são uma única operação lógica: não pode sobrar uma
+    // execução "done" com a instância ainda apontando pra etapa antiga.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.execucaoDeEtapa.create({
+        data: {
+          instanciaId,
+          etapaId: etapaAtual.id,
+          numeroDaExecucao,
+          ator: 'usuario',
+          atorUsuarioId,
+          input: dadosFormulario as Prisma.InputJsonValue,
+          output: dadosFormulario as Prisma.InputJsonValue,
+          status: 'done',
+          concluidoEm: new Date(),
+          chaveIdempotencia: chaveIdempotencia(
+            instanciaId,
+            etapaAtual.id,
+            numeroDaExecucao,
+          ),
+        },
+      });
+
+      await tx.instanciaDeProcesso.update({
+        where: { id: instanciaId },
+        data: { dadosAcumulados: dadosAcumulados as Prisma.InputJsonValue },
+      });
+
+      await tx.instanciaDeProcesso.update({
+        where: { id: instanciaId },
+        data: acao.etapaDestinoId
+          ? { etapaAtualId: acao.etapaDestinoId }
+          : { status: 'concluido' },
+      });
     });
 
+    // Passo lógico separado (entrar na etapa de destino) — fica fora da
+    // transação acima para não aninhar transações.
     if (acao.etapaDestinoId) {
-      await this.prisma.instanciaDeProcesso.update({
-        where: { id: instanciaId },
-        data: { etapaAtualId: acao.etapaDestinoId },
-      });
       await this.entrarNaEtapa(instanciaId, acao.etapaDestinoId);
-    } else {
-      await this.prisma.instanciaDeProcesso.update({
-        where: { id: instanciaId },
-        data: { status: 'concluido' },
-      });
     }
 
     return this.prisma.instanciaDeProcesso.findUniqueOrThrow({

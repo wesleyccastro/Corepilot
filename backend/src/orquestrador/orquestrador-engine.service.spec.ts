@@ -4,7 +4,7 @@ import type { PrismaService } from '../prisma/prisma.service';
 
 describe('OrquestradorEngineService', () => {
   function buildPrisma() {
-    return {
+    const prisma = {
       fluxo: { findFirst: jest.fn() },
       etapa: { findUniqueOrThrow: jest.fn(), findFirst: jest.fn() },
       instanciaDeProcesso: {
@@ -19,6 +19,10 @@ describe('OrquestradorEngineService', () => {
         count: jest.fn().mockResolvedValue(0),
         findMany: jest.fn(),
       },
+    };
+    return {
+      ...prisma,
+      $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(prisma)),
     } as unknown as PrismaService;
   }
 
