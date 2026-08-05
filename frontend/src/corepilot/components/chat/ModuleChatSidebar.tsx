@@ -93,6 +93,7 @@ export function ModuleChatSidebar({ module, state, actions, onConfigure }: Modul
       onTogglePin={(id) => actions.togglePinChat(listKey, id)}
       onAssignTag={(id, tagId) => actions.assignChatTag(listKey, id, tagId)}
       onArchive={(id) => actions.hideChat(listKey, id)}
+      onRename={(id, titulo) => actions.renameChat(listKey, id, titulo)}
       onDelete={(id) =>
         actions.abrirConfirmacao({
           titulo: 'Excluir conversa',

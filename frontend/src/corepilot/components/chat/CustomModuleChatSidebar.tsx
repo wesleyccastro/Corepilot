@@ -66,6 +66,7 @@ export function CustomModuleChatSidebar({ moduloId, state, actions, onConfigure 
       onTogglePin={(id) => void actions.fixarConversaModulo(moduloId, id)}
       onAssignTag={(id, tagId) => actions.atribuirTagConversaModulo(moduloId, id, tagId)}
       onArchive={(id) => void actions.arquivarConversaModulo(moduloId, id)}
+      onRename={(id, titulo) => void actions.renomearConversaModulo(moduloId, id, titulo)}
       onDelete={(id) =>
         actions.abrirConfirmacao({
           titulo: 'Excluir conversa',

@@ -1,4 +1,4 @@
-import type { ChangeEvent } from 'react';
+import { useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { ArchiveIcon, DatabaseIcon, DotsIcon, GearIcon, PinIcon, SearchIcon, TagIcon } from '../../icons';
 import { colors, overlayFixed } from '../../styles';
 
@@ -52,6 +52,7 @@ export interface ChatSidebarShellProps {
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
   onRestore: (id: string) => void;
+  onRename: (id: string, titulo: string) => void;
 }
 
 export function ChatSidebarShell(props: ChatSidebarShellProps) {
@@ -60,7 +61,7 @@ export function ChatSidebarShell(props: ChatSidebarShellProps) {
     search, onSearchChange, activeTagId, onSetTag, tags, tagsExpanded, onToggleTagsExpanded,
     showNewTagForm, newTagName, onToggleNewTagForm, onNewTagNameChange, onAddTag, onRemoveTag,
     archiveView, onOpenArchive, onCloseArchive, visibleItems, archivedItems, activeItemId, onSelectItem,
-    menuOpenId, onToggleItemMenu, onCloseItemMenu, onTogglePin, onAssignTag, onArchive, onDelete, onRestore,
+    menuOpenId, onToggleItemMenu, onCloseItemMenu, onTogglePin, onAssignTag, onArchive, onDelete, onRestore, onRename,
   } = props;
 
   return (
@@ -166,6 +167,7 @@ export function ChatSidebarShell(props: ChatSidebarShellProps) {
               onAssignTag={(tagId) => onAssignTag(item.id, tagId)}
               onArchive={() => onArchive(item.id)}
               onDelete={() => onDelete(item.id)}
+              onRename={(titulo) => onRename(item.id, titulo)}
             />
           ))}
         </>
@@ -192,7 +194,7 @@ export function ChatSidebarShell(props: ChatSidebarShellProps) {
 }
 
 function ChatSidebarRow({
-  item, active, tags, menuOpen, onSelect, onToggleMenu, onCloseMenu, onTogglePin, onAssignTag, onArchive, onDelete,
+  item, active, tags, menuOpen, onSelect, onToggleMenu, onCloseMenu, onTogglePin, onAssignTag, onArchive, onDelete, onRename,
 }: {
   item: ChatSidebarItem;
   active: boolean;
@@ -205,8 +207,31 @@ function ChatSidebarRow({
   onAssignTag: (tagId: string) => (e: { stopPropagation: () => void }) => void;
   onArchive: () => void;
   onDelete: () => void;
+  onRename: (titulo: string) => void;
 }) {
   const highlighted = item.pinned || active;
+  const [renaming, setRenaming] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(item.title);
+
+  const iniciarRename = () => {
+    setDraftTitle(item.title);
+    setRenaming(true);
+    onCloseMenu();
+  };
+  const confirmarRename = () => {
+    setRenaming(false);
+    const titulo = draftTitle.trim();
+    if (titulo && titulo !== item.title) onRename(titulo);
+  };
+  const cancelarRename = () => {
+    setDraftTitle(item.title);
+    setRenaming(false);
+  };
+  const onRenameKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') { e.preventDefault(); confirmarRename(); }
+    if (e.key === 'Escape') { e.preventDefault(); cancelarRename(); }
+  };
+
   return (
     <div
       style={{
@@ -215,13 +240,28 @@ function ChatSidebarRow({
         border: highlighted ? `1px solid ${active ? colors.teal : colors.border}` : undefined,
       }}
     >
-      <div onClick={onSelect} style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          {item.pinned && <PinIcon />}
-          <div style={{ fontSize: 13, fontWeight: highlighted ? 700 : 600, color: highlighted ? colors.navy : colors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</div>
+      {renaming ? (
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <input
+            type="text"
+            autoFocus
+            value={draftTitle}
+            onChange={(e) => setDraftTitle(e.target.value)}
+            onBlur={confirmarRename}
+            onKeyDown={onRenameKeyDown}
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: '100%', fontSize: 13, fontWeight: 700, color: colors.navy, border: `1px solid ${colors.teal}`, borderRadius: 6, padding: '3px 6px' }}
+          />
         </div>
-        <div style={{ fontSize: 11.5, color: colors.textFaint }}>{item.subtitle}</div>
-      </div>
+      ) : (
+        <div onClick={onSelect} style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            {item.pinned && <PinIcon />}
+            <div style={{ fontSize: 13, fontWeight: highlighted ? 700 : 600, color: highlighted ? colors.navy : colors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</div>
+          </div>
+          <div style={{ fontSize: 11.5, color: colors.textFaint }}>{item.subtitle}</div>
+        </div>
+      )}
       <div style={{ position: 'relative', flexShrink: 0 }}>
         <span onClick={(e) => { e.stopPropagation(); onToggleMenu(); }}>
           <DotsIcon />
@@ -242,6 +282,9 @@ function ChatSidebarRow({
                     );
                   })}
                 </div>
+              </div>
+              <div onClick={(e) => { e.stopPropagation(); iniciarRename(); }} style={{ padding: '9px 14px', fontSize: 12.5, fontWeight: 600, color: colors.text, cursor: 'pointer', borderTop: `1px solid ${colors.borderLight}` }}>
+                Renomear
               </div>
               <div onClick={(e) => { e.stopPropagation(); onTogglePin(); }} style={{ padding: '9px 14px', fontSize: 12.5, fontWeight: 600, color: colors.text, cursor: 'pointer', borderTop: `1px solid ${colors.borderLight}` }}>
                 {item.pinned ? 'Desafixar' : 'Fixar'}

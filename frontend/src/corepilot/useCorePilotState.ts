@@ -378,6 +378,11 @@ export function useCorePilotState(accessToken: string) {
     update({ chatMenuOpenId: null });
     showToast('Conversa excluída.');
   };
+  const renameChat = (listKey: ChatListKey, id: string, titulo: string) => {
+    const tituloLimpo = titulo.trim();
+    if (!tituloLimpo) return;
+    setChatList(listKey, (list) => list.map((c) => (c.id === id ? { ...c, title: tituloLimpo } : c)));
+  };
   const restoreChat = (listKey: ChatListKey, id: string) => {
     setChatList(listKey, (list) => list.map((c) => (c.id === id ? { ...c, hidden: false } : c)));
     showToast('Conversa reexibida.');
@@ -1185,6 +1190,21 @@ export function useCorePilotState(accessToken: string) {
     }
   };
 
+  const renomearConversaModulo = async (moduloId: string, conversaId: string, titulo: string) => {
+    const tituloLimpo = titulo.trim();
+    if (!tituloLimpo) return;
+    const anterior = state.moduloConversas.find((c) => c.id === conversaId)?.titulo ?? null;
+    update((s) => ({
+      moduloConversas: s.moduloConversas.map((c) => (c.id === conversaId ? { ...c, titulo: tituloLimpo } : c)),
+    }));
+    try {
+      await atualizarConversa(accessToken, moduloId, conversaId, { titulo: tituloLimpo });
+    } catch (err) {
+      update((s) => ({ moduloConversas: s.moduloConversas.map((c) => (c.id === conversaId ? { ...c, titulo: anterior } : c)) }));
+      showToast(err instanceof Error ? err.message : 'Erro ao renomear conversa');
+    }
+  };
+
   const excluirConversaModulo = async (moduloId: string, conversaId: string) => {
     const eraAtiva = state.moduloConversaId === conversaId;
     update((s) => ({
@@ -1299,7 +1319,7 @@ export function useCorePilotState(accessToken: string) {
     askSuggested, setTestResult, publishModule, saveDraft, testModule, salvarModuloReal, nextStep, prevStep, viewWizardNew,
     editModule, editComprasModule, editFinanceiroModule, editActiveModule, backFromWizardEdit,
     setComprasBoard, setComprasChat, toggleComprasBases, toggleFinanceiroBases, closeBasesMenus,
-    toggleChatMenu, closeChatMenu, togglePinChat, hideChat, deleteChat, restoreChat,
+    toggleChatMenu, closeChatMenu, togglePinChat, hideChat, deleteChat, renameChat, restoreChat,
     updateComprasSearch, updateFinanceiroSearch, setComprasTag, setFinanceiroTag,
     toggleComprasTagsExpanded, toggleFinanceiroTagsExpanded, toggleNewTagForm, updateNewTagName, addTag, removeTag, assignChatTag,
     openComprasArchive, closeComprasArchive, openFinanceiroArchive, closeFinanceiroArchive, autoGrowInput,
@@ -1333,7 +1353,7 @@ export function useCorePilotState(accessToken: string) {
     selecionarSkillParaTeste, updateSkillTestEntrada, executarTesteSkillReal,
     carregarConversaDoModulo, updateModuloChatDraft, enviarMensagemModuloReal,
     criarConversaModulo, selecionarConversaModulo, arquivarConversaModulo, desarquivarConversaModulo,
-    fixarConversaModulo, excluirConversaModulo, atualizarBuscaConversasModulo,
+    fixarConversaModulo, excluirConversaModulo, renomearConversaModulo, atualizarBuscaConversasModulo,
     abrirArquivadasModulo, fecharArquivadasModulo, toggleTagsExpandedModulo, definirTagAtivaModulo,
     toggleNewTagFormModulo, updateNewTagNameModulo, toggleBasesModulo,
     criarTagModulo, removerTagModulo, atribuirTagConversaModulo,
