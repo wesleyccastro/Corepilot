@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import type { Etapa, Fluxo, Macroetapa, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -314,5 +315,43 @@ export class FluxoService {
       throw new NotFoundException('Etapa não encontrada neste fluxo');
     }
     return etapa;
+  }
+
+  async publicar(moduloId: string, empresaId: string): Promise<Fluxo> {
+    const fluxo = await this.getOrCreateRascunho(moduloId, empresaId);
+    if (fluxo.etapas.length === 0) {
+      throw new UnprocessableEntityException(
+        'O fluxo precisa de pelo menos uma etapa para ser publicado',
+      );
+    }
+
+    for (const etapa of fluxo.etapas) {
+      if (!executorValido(etapa.tipo, etapa.executor)) {
+        throw new UnprocessableEntityException(
+          `Etapa "${etapa.nome}": combinação de tipo e executor inválida`,
+        );
+      }
+      if (
+        etapa.tipo === 'tarefa_agente' &&
+        (!etapa.agenteId || !etapa.skillId)
+      ) {
+        throw new UnprocessableEntityException(
+          `Etapa "${etapa.nome}": precisa de um agente e uma skill selecionados`,
+        );
+      }
+      if (
+        etapa.tipo === 'aprovacao' &&
+        (etapa.aprovadores as unknown as string[]).length === 0
+      ) {
+        throw new UnprocessableEntityException(
+          `Etapa "${etapa.nome}": precisa de pelo menos um aprovador`,
+        );
+      }
+    }
+
+    return this.prisma.fluxo.update({
+      where: { id: fluxo.id },
+      data: { publicado: true },
+    });
   }
 }

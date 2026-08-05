@@ -584,3 +584,114 @@ describe('FluxoService — Etapa', () => {
     ).toBe(2);
   });
 });
+
+describe('FluxoService — publicar', () => {
+  function buildDeps() {
+    const prisma = {
+      fluxo: { findFirst: jest.fn(), update: jest.fn() },
+    } as unknown as PrismaService;
+    const moduloService = {
+      findByIdInEmpresa: jest.fn().mockResolvedValue({ id: 'modulo-1' }),
+    } as unknown as ModuloService;
+    return { prisma, moduloService };
+  }
+
+  const etapaValida = {
+    id: 'e-1',
+    nome: 'IA confere',
+    tipo: 'tarefa_agente' as const,
+    executor: 'agente' as const,
+    agenteId: 'agente-1',
+    skillId: 'skill-1',
+    aprovadores: [],
+  };
+
+  it('rejeita publicar um fluxo sem etapas', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue({
+      id: 'fluxo-1',
+      etapas: [],
+    });
+    const service = new FluxoService(prisma, moduloService);
+
+    await expect(service.publicar('modulo-1', 'empresa-1')).rejects.toThrow(
+      'pelo menos uma etapa',
+    );
+  });
+
+  it('rejeita publicar uma etapa de agente sem skill selecionada', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue({
+      id: 'fluxo-1',
+      etapas: [{ ...etapaValida, skillId: null }],
+    });
+    const service = new FluxoService(prisma, moduloService);
+
+    await expect(service.publicar('modulo-1', 'empresa-1')).rejects.toThrow(
+      'precisa de um agente e uma skill',
+    );
+  });
+
+  it('rejeita publicar uma etapa de aprovação sem aprovadores', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue({
+      id: 'fluxo-1',
+      etapas: [
+        {
+          id: 'e-2',
+          nome: 'Comprador valida',
+          tipo: 'aprovacao',
+          executor: 'usuario',
+          aprovadores: [],
+        },
+      ],
+    });
+    const service = new FluxoService(prisma, moduloService);
+
+    await expect(service.publicar('modulo-1', 'empresa-1')).rejects.toThrow(
+      'pelo menos um aprovador',
+    );
+  });
+
+  it('rejeita publicar uma combinação Tipo×Executor inválida', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue({
+      id: 'fluxo-1',
+      etapas: [
+        {
+          id: 'e-3',
+          nome: 'X',
+          tipo: 'interacao_usuario',
+          executor: 'automatico',
+          aprovadores: [],
+        },
+      ],
+    });
+    const service = new FluxoService(prisma, moduloService);
+
+    await expect(service.publicar('modulo-1', 'empresa-1')).rejects.toThrow(
+      'combinação de tipo e executor inválida',
+    );
+  });
+
+  it('publica um fluxo válido', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue({
+      id: 'fluxo-1',
+      etapas: [etapaValida],
+    });
+    (prisma.fluxo.update as jest.Mock).mockResolvedValue({
+      id: 'fluxo-1',
+      publicado: true,
+    });
+    const service = new FluxoService(prisma, moduloService);
+
+    const resultado = await service.publicar('modulo-1', 'empresa-1');
+
+    expect(prisma.fluxo.update).toHaveBeenCalledWith({
+      where: { id: 'fluxo-1' },
+      data: { publicado: true },
+    });
+    expect(resultado.publicado).toBe(true);
+  });
+});

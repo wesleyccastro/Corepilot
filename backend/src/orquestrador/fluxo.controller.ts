@@ -9,9 +9,11 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TenantGuard } from '../auth/tenant.guard';
 import { TenantContext } from '../auth/tenant-context';
+import { AuditService } from '../audit/audit.service';
 import { FluxoService } from './fluxo.service';
 import type { CreateMacroetapaDto } from './dto/create-macroetapa.dto';
 import type { UpdateMacroetapaDto } from './dto/update-macroetapa.dto';
@@ -24,6 +26,7 @@ export class FluxoController {
   constructor(
     private readonly fluxoService: FluxoService,
     private readonly tenantContext: TenantContext,
+    private readonly audit: AuditService,
   ) {}
 
   @Get()
@@ -101,5 +104,22 @@ export class FluxoController {
   ) {
     const { empresaId } = this.tenantContext.get();
     await this.fluxoService.excluirEtapa(moduloId, empresaId, etapaId);
+  }
+
+  @Post('publicar')
+  async publicar(@Param('moduloId') moduloId: string) {
+    const { usuarioId, empresaId } = this.tenantContext.get();
+    const fluxo = await this.fluxoService.publicar(moduloId, empresaId);
+    await this.audit.record({
+      empresaId,
+      atorUsuarioId: usuarioId,
+      acao: 'fluxo_publicado',
+      dadosDepois: {
+        fluxoId: fluxo.id,
+        moduloId,
+        versao: fluxo.versao,
+      } as unknown as Prisma.InputJsonValue,
+    });
+    return fluxo;
   }
 }
