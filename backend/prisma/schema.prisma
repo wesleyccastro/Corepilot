@@ -33,11 +33,11 @@ model Usuario {
   email          String   @unique
   criadoEm       DateTime @default(now())
 
-  empresas          UsuarioEmpresa[]
-  auditLogs         AuditLog[]
-  conversas         Conversa[]
-  skillExecucoes    SkillExecucao[]
-  execucoesDeEtapa  ExecucaoDeEtapa[]
+  empresas         UsuarioEmpresa[]
+  auditLogs        AuditLog[]
+  conversas        Conversa[]
+  skillExecucoes   SkillExecucao[]
+  execucoesDeEtapa ExecucaoDeEtapa[]
 }
 
 enum Perfil {
@@ -141,16 +141,16 @@ model Mensagem {
 }
 
 model Agente {
-  id                String   @id @default(uuid())
-  empresaId         String
-  moduloId          String
-  nome              String
-  funcao            String
-  objetivo          String
-  guardrails        String?
+  id                 String   @id @default(uuid())
+  empresaId          String
+  moduloId           String
+  nome               String
+  funcao             String
+  objetivo           String
+  guardrails         String?
   regraEscalonamento String?
-  modeloIA          String   @default("claude-sonnet-5")
-  criadoEm          DateTime @default(now())
+  modeloIA           String   @default("claude-sonnet-5")
+  criadoEm           DateTime @default(now())
 
   empresa Empresa @relation(fields: [empresaId], references: [id])
   modulo  Modulo  @relation(fields: [moduloId], references: [id])
@@ -351,8 +351,8 @@ model ExecucaoDeEtapa {
   concluidoEm       DateTime?
 
   instancia InstanciaDeProcesso @relation(fields: [instanciaId], references: [id])
-  etapa     Etapa                @relation(fields: [etapaId], references: [id])
-  usuario   Usuario?             @relation(fields: [atorUsuarioId], references: [id])
+  etapa     Etapa               @relation(fields: [etapaId], references: [id])
+  usuario   Usuario?            @relation(fields: [atorUsuarioId], references: [id])
 }
 
 model IntegracaoWhatsApp {
