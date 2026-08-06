@@ -9,7 +9,11 @@ import type { EvolutionApiAdapterService } from '../integracao-whatsapp/evolutio
 describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
   function buildDeps() {
     const prisma = {
-      execucaoDeEtapa: { findMany: jest.fn(), update: jest.fn() },
+      execucaoDeEtapa: {
+        findMany: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
       instanciaDeProcesso: { update: jest.fn() },
     } as unknown as PrismaService;
     (prisma as unknown as { $transaction: jest.Mock }).$transaction = jest.fn(
@@ -59,9 +63,9 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
   it('processa uma execução de agente pendente, grava a saída e avança', async () => {
     const { prisma, anthropicService, engine, evolutionApi, config } =
       buildDeps();
-    (prisma.execucaoDeEtapa.findMany as jest.Mock).mockResolvedValue([
-      execucaoPendente,
-    ]);
+    (prisma.execucaoDeEtapa.findMany as jest.Mock)
+      .mockResolvedValueOnce([]) // recuperarExecucoesTravadas
+      .mockResolvedValueOnce([execucaoPendente]); // pendentes
     (anthropicService.parseStructured as jest.Mock).mockResolvedValue({
       parsed_output: { grupos: ['parafusos'] },
       usage: { input_tokens: 100, output_tokens: 20 },
@@ -76,12 +80,10 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
 
     await worker.processarFilaAgentes();
 
-    expect(prisma.execucaoDeEtapa.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'exec-1' },
-        data: expect.objectContaining({ status: 'processing' }),
-      }),
-    );
+    expect(prisma.execucaoDeEtapa.updateMany).toHaveBeenCalledWith({
+      where: { id: 'exec-1', status: 'pending' },
+      data: { status: 'processing' },
+    });
     expect(prisma.execucaoDeEtapa.update).toHaveBeenLastCalledWith(
       expect.objectContaining({
         where: { id: 'exec-1' },
@@ -107,9 +109,9 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
         },
       },
     };
-    (prisma.execucaoDeEtapa.findMany as jest.Mock).mockResolvedValue([
-      execucaoComMaisDados,
-    ]);
+    (prisma.execucaoDeEtapa.findMany as jest.Mock)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([execucaoComMaisDados]);
     (anthropicService.parseStructured as jest.Mock).mockResolvedValue({
       parsed_output: { grupos: [] },
       usage: { input_tokens: 1, output_tokens: 1 },
@@ -133,9 +135,9 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
   it('marca a execução e a instância como falha quando a Anthropic lança erro', async () => {
     const { prisma, anthropicService, engine, evolutionApi, config } =
       buildDeps();
-    (prisma.execucaoDeEtapa.findMany as jest.Mock).mockResolvedValue([
-      execucaoPendente,
-    ]);
+    (prisma.execucaoDeEtapa.findMany as jest.Mock)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([execucaoPendente]);
     (anthropicService.parseStructured as jest.Mock).mockRejectedValue(
       new Error('timeout'),
     );
@@ -170,10 +172,9 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
       id: 'exec-2',
       instanciaId: 'inst-2',
     };
-    (prisma.execucaoDeEtapa.findMany as jest.Mock).mockResolvedValue([
-      execucaoPendente,
-      segunda,
-    ]);
+    (prisma.execucaoDeEtapa.findMany as jest.Mock)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([execucaoPendente, segunda]);
     (anthropicService.parseStructured as jest.Mock)
       .mockRejectedValueOnce(new Error('timeout'))
       .mockResolvedValueOnce({
@@ -196,9 +197,9 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
   it('mantém a execução "done" quando avancar falha depois do commit', async () => {
     const { prisma, anthropicService, engine, evolutionApi, config } =
       buildDeps();
-    (prisma.execucaoDeEtapa.findMany as jest.Mock).mockResolvedValue([
-      execucaoPendente,
-    ]);
+    (prisma.execucaoDeEtapa.findMany as jest.Mock)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([execucaoPendente]);
     (anthropicService.parseStructured as jest.Mock).mockResolvedValue({
       parsed_output: { grupos: ['parafusos'] },
       usage: { input_tokens: 100, output_tokens: 20 },
@@ -243,7 +244,7 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
       execucaoDeEtapa: {
         findMany: jest.fn(),
         update: jest.fn(),
-        findFirst: jest.fn().mockResolvedValue(null),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       instanciaDeProcesso: { update: jest.fn() },
       integracaoWhatsApp: { findUnique: jest.fn() },
@@ -286,9 +287,9 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
   it('envia via Evolution API com o texto padrão numa etapa de integração pura, e avança', async () => {
     const { prisma, anthropicService, engine, evolutionApi, config } =
       buildDeps();
-    (prisma.execucaoDeEtapa.findMany as jest.Mock).mockResolvedValue([
-      execucaoIntegracaoPura,
-    ]);
+    (prisma.execucaoDeEtapa.findMany as jest.Mock)
+      .mockResolvedValueOnce([]) // recuperarExecucoesTravadas
+      .mockResolvedValueOnce([execucaoIntegracaoPura]); // pendentes
     (prisma.integracaoWhatsApp.findUnique as jest.Mock).mockResolvedValue(
       integracaoSalva,
     );
@@ -328,9 +329,9 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
         agente: { nome: 'Agente de Compras', modeloIA: 'claude-sonnet-5' },
       },
     };
-    (prisma.execucaoDeEtapa.findMany as jest.Mock).mockResolvedValue([
-      execucaoComAgente,
-    ]);
+    (prisma.execucaoDeEtapa.findMany as jest.Mock)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([execucaoComAgente]);
     (prisma.integracaoWhatsApp.findUnique as jest.Mock).mockResolvedValue(
       integracaoSalva,
     );
@@ -358,36 +359,12 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
     );
   });
 
-  it('não reenvia quando já existe uma execução done com a mesma chave de idempotência', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
-    (prisma.execucaoDeEtapa.findMany as jest.Mock).mockResolvedValue([
-      execucaoIntegracaoPura,
-    ]);
-    (prisma.execucaoDeEtapa.findFirst as jest.Mock).mockResolvedValue({
-      id: 'exec-antiga',
-      output: { texto: 'x', messageId: 'msg-0' },
-    });
-    const worker = new OrquestradorFilaWorker(
-      prisma,
-      anthropicService,
-      engine,
-      evolutionApi,
-      config,
-    );
-
-    await worker.processarFilaIntegracoes();
-
-    expect(evolutionApi.enviarMensagem).not.toHaveBeenCalled();
-    expect(engine.avancar).toHaveBeenCalledWith('inst-1', 'e-6');
-  });
-
   it('marca falha e instância em erro quando não há telefone de destino nem na instância nem na integração', async () => {
     const { prisma, anthropicService, engine, evolutionApi, config } =
       buildDeps();
-    (prisma.execucaoDeEtapa.findMany as jest.Mock).mockResolvedValue([
-      execucaoIntegracaoPura,
-    ]);
+    (prisma.execucaoDeEtapa.findMany as jest.Mock)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([execucaoIntegracaoPura]);
     (prisma.integracaoWhatsApp.findUnique as jest.Mock).mockResolvedValue({
       ...integracaoSalva,
       phone: null,
@@ -407,5 +384,74 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
       where: { id: 'inst-1' },
       data: { status: 'erro' },
     });
+  });
+
+  it('reivindicação atômica evita envio duplicado quando um segundo tick concorrente pega a mesma execução pendente', async () => {
+    const { prisma, anthropicService, engine, evolutionApi, config } =
+      buildDeps();
+    // Simula duas execuções "concorrentes" do @Interval: ambas enxergam a
+    // mesma linha pending (o mock de findMany não reflete a escrita da
+    // primeira tick), mas só a primeira consegue reivindicá-la — o
+    // updateMany da segunda retorna count: 0 porque a linha já não está mais
+    // "pending" na base real.
+    (prisma.execucaoDeEtapa.findMany as jest.Mock)
+      .mockResolvedValueOnce([]) // recuperarExecucoesTravadas — 1º tick
+      .mockResolvedValueOnce([execucaoIntegracaoPura]) // pendentes — 1º tick
+      .mockResolvedValueOnce([]) // recuperarExecucoesTravadas — 2º tick
+      .mockResolvedValueOnce([execucaoIntegracaoPura]); // pendentes — 2º tick
+    (prisma.execucaoDeEtapa.updateMany as jest.Mock)
+      .mockResolvedValueOnce({ count: 1 }) // 1º tick reivindica com sucesso
+      .mockResolvedValueOnce({ count: 0 }); // 2º tick chega tarde demais
+    (prisma.integracaoWhatsApp.findUnique as jest.Mock).mockResolvedValue(
+      integracaoSalva,
+    );
+    (evolutionApi.enviarMensagem as jest.Mock).mockResolvedValue({
+      messageId: 'msg-1',
+    });
+    const worker = new OrquestradorFilaWorker(
+      prisma,
+      anthropicService,
+      engine,
+      evolutionApi,
+      config,
+    );
+
+    await worker.processarFilaIntegracoes();
+    await worker.processarFilaIntegracoes();
+
+    expect(evolutionApi.enviarMensagem).toHaveBeenCalledTimes(1);
+    expect(engine.avancar).toHaveBeenCalledTimes(1);
+  });
+
+  it('recupera execução travada em processing além do limite, marcando falha sem reenviar', async () => {
+    const { prisma, anthropicService, engine, evolutionApi, config } =
+      buildDeps();
+    const execucaoTravada = { id: 'exec-travada', instanciaId: 'inst-2' };
+    (prisma.execucaoDeEtapa.findMany as jest.Mock)
+      .mockResolvedValueOnce([execucaoTravada]) // recuperarExecucoesTravadas encontra a linha travada
+      .mockResolvedValueOnce([]); // nada pending pra processar depois
+    const worker = new OrquestradorFilaWorker(
+      prisma,
+      anthropicService,
+      engine,
+      evolutionApi,
+      config,
+    );
+
+    await worker.processarFilaIntegracoes();
+
+    expect(prisma.execucaoDeEtapa.update).toHaveBeenCalledWith({
+      where: { id: 'exec-travada' },
+      data: expect.objectContaining({
+        status: 'failed',
+        mensagemErro: expect.stringContaining('travada em processing'),
+      }),
+    });
+    expect(prisma.instanciaDeProcesso.update).toHaveBeenCalledWith({
+      where: { id: 'inst-2' },
+      data: { status: 'erro' },
+    });
+    expect(evolutionApi.enviarMensagem).not.toHaveBeenCalled();
+    expect(engine.avancar).not.toHaveBeenCalled();
   });
 });

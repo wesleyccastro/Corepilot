@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Interval } from '@nestjs/schedule';
 import type {
   Agente,
+  AtorExecucao,
   Etapa,
   ExecucaoDeEtapa,
   InstanciaDeProcesso,
@@ -46,6 +47,13 @@ function montarSystemPromptDaEtapa(agente: Agente, skill: Skill): string {
 export class OrquestradorFilaWorker {
   private readonly logger = new Logger(OrquestradorFilaWorker.name);
 
+  // Tempo máximo que uma execução pode ficar em "processing" antes de ser
+  // considerada travada (ex.: o servidor reiniciou entre o envio externo e a
+  // gravação do "done"). Anthropic/Evolution respondem em segundos, não
+  // minutos, então 2 minutos já é uma folga generosa para uma tentativa
+  // legítima em andamento.
+  private readonly LIMITE_PROCESSING_MS = 2 * 60 * 1000;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly anthropicService: AnthropicService,
@@ -54,8 +62,59 @@ export class OrquestradorFilaWorker {
     private readonly config: ConfigService,
   ) {}
 
+  // Recuperação de execuções travadas: se o processo cair depois de reivindicar
+  // uma execução (status "processing") mas antes de gravar o resultado final
+  // ("done"/"failed"), a linha nunca mais seria reprocessada — o polling só
+  // olha para "pending". Isso a resgata como uma falha visível e acionável em
+  // vez de deixá-la travada silenciosamente para sempre. Não tentamos reenviar
+  // automaticamente: não há como saber com segurança se o envio externo já
+  // aconteceu antes da queda.
+  private async recuperarExecucoesTravadas(ator: AtorExecucao): Promise<void> {
+    const travadas = await this.prisma.execucaoDeEtapa.findMany({
+      where: {
+        status: 'processing',
+        ator,
+        criadoEm: { lt: new Date(Date.now() - this.LIMITE_PROCESSING_MS) },
+      },
+    });
+
+    for (const execucao of travadas) {
+      this.logger.error(
+        `Execução ${execucao.id} está travada em "processing" há mais de ${this.LIMITE_PROCESSING_MS}ms — marcando como falha para revisão manual`,
+      );
+      await this.prisma.execucaoDeEtapa.update({
+        where: { id: execucao.id },
+        data: {
+          status: 'failed',
+          mensagemErro:
+            'Execução travada em processing (possível reinício do servidor durante o processamento) — verifique manualmente se a mensagem já foi enviada antes de tentar novamente.',
+          concluidoEm: new Date(),
+        },
+      });
+      await this.prisma.instanciaDeProcesso.update({
+        where: { id: execucao.instanciaId },
+        data: { status: 'erro' },
+      });
+    }
+  }
+
+  // Reivindicação atômica: só transiciona "pending" -> "processing" se a linha
+  // ainda estiver "pending" no momento da escrita. Sem isso, duas execuções
+  // concorrentes do @Interval (ex.: um lote anterior que ainda não terminou
+  // quando o próximo tick dispara) poderiam ambas pegar a mesma linha
+  // "pending" do findMany e enviar a mensagem duas vezes.
+  private async reivindicarExecucao(execucaoId: string): Promise<boolean> {
+    const resultado = await this.prisma.execucaoDeEtapa.updateMany({
+      where: { id: execucaoId, status: 'pending' },
+      data: { status: 'processing' },
+    });
+    return resultado.count > 0;
+  }
+
   @Interval(5000)
   async processarFilaAgentes(): Promise<void> {
+    await this.recuperarExecucoesTravadas('agente');
+
     const pendentes = (await this.prisma.execucaoDeEtapa.findMany({
       where: { status: 'pending', ator: 'agente' },
       orderBy: { criadoEm: 'asc' },
@@ -67,6 +126,10 @@ export class OrquestradorFilaWorker {
     })) as ExecucaoDeAgente[];
 
     for (const execucao of pendentes) {
+      if (!(await this.reivindicarExecucao(execucao.id))) {
+        continue;
+      }
+
       let processouComSucesso = false;
       try {
         await this.processarExecucaoDeAgente(execucao);
@@ -115,11 +178,8 @@ export class OrquestradorFilaWorker {
   private async processarExecucaoDeAgente(
     execucao: ExecucaoDeAgente,
   ): Promise<void> {
-    await this.prisma.execucaoDeEtapa.update({
-      where: { id: execucao.id },
-      data: { status: 'processing' },
-    });
-
+    // A transição para "processing" já foi feita atomicamente por
+    // reivindicarExecucao, no loop de processarFilaAgentes.
     const { etapa, instancia } = execucao;
     if (!etapa.agente || !etapa.skill) {
       throw new Error(
@@ -186,6 +246,8 @@ export class OrquestradorFilaWorker {
 
   @Interval(5000)
   async processarFilaIntegracoes(): Promise<void> {
+    await this.recuperarExecucoesTravadas('integracao');
+
     const pendentes = (await this.prisma.execucaoDeEtapa.findMany({
       where: { status: 'pending', ator: 'integracao' },
       orderBy: { criadoEm: 'asc' },
@@ -194,6 +256,10 @@ export class OrquestradorFilaWorker {
     })) as ExecucaoDeIntegracao[];
 
     for (const execucao of pendentes) {
+      if (!(await this.reivindicarExecucao(execucao.id))) {
+        continue;
+      }
+
       let processouComSucesso = false;
       try {
         await this.processarExecucaoDeIntegracao(execucao);
@@ -219,8 +285,7 @@ export class OrquestradorFilaWorker {
 
       // Mesmo padrão de processarFilaAgentes: engine.avancar roda fora do
       // try/catch que marca falha. Nesse ponto a execução já foi commitada
-      // como "done" (envio ocorreu com sucesso, ou já tinha sido enviada
-      // antes e a idempotência foi respeitada). Se avancar falhar, só a
+      // como "done" (envio ocorreu com sucesso). Se avancar falhar, só a
       // instância fica travada em erro — nunca sobrescrevemos o registro de
       // execução, já concluído, de volta para "failed".
       if (processouComSucesso) {
@@ -243,32 +308,17 @@ export class OrquestradorFilaWorker {
   private async processarExecucaoDeIntegracao(
     execucao: ExecucaoDeIntegracao,
   ): Promise<void> {
-    await this.prisma.execucaoDeEtapa.update({
-      where: { id: execucao.id },
-      data: { status: 'processing' },
-    });
-
-    const jaEnviada = await this.prisma.execucaoDeEtapa.findFirst({
-      where: {
-        chaveIdempotencia: execucao.chaveIdempotencia,
-        status: 'done',
-        id: { not: execucao.id },
-      },
-    });
-    if (jaEnviada) {
-      await this.prisma.$transaction(async (tx) => {
-        await tx.execucaoDeEtapa.update({
-          where: { id: execucao.id },
-          data: {
-            status: 'done',
-            output: jaEnviada.output as Prisma.InputJsonValue,
-            concluidoEm: new Date(),
-          },
-        });
-      });
-      return;
-    }
-
+    // A transição para "processing" já foi feita atomicamente por
+    // reivindicarExecucao, no loop de processarFilaIntegracoes. Não há mais
+    // uma checagem de idempotência por chaveIdempotencia aqui: chaveIdempotencia
+    // é @unique no schema e atribuída uma única vez por linha na criação
+    // (Task 6), então nunca existem duas linhas distintas com a mesma chave —
+    // esse cross-row findFirst nunca conseguia encontrar nada em operação real.
+    // A garantia de segurança real contra reenvio é a reivindicação atômica
+    // acima (impede duas ticks concorrentes de processarem a mesma linha) mais
+    // a recuperação de execuções travadas (recuperarExecucoesTravadas), que
+    // marca falha visível em vez de reenviar quando uma queda deixa a linha
+    // presa em "processing".
     const { etapa, instancia } = execucao;
     const integracao = await this.prisma.integracaoWhatsApp.findUnique({
       where: { empresaId: instancia.empresaId },
