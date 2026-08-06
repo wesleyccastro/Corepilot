@@ -239,6 +239,37 @@ export class FluxoService {
     if (dto.macroetapaId)
       await this.garantirMacroetapaDoFluxo(fluxo.id, dto.macroetapaId);
 
+    // Sem estas checagens, agenteId/skillId/loopParaEtapaId viriam direto do
+    // corpo da requisição pra dentro do update: a FK do Prisma só garante que
+    // o registro existe em algum lugar, não que pertence a esta empresa (ou,
+    // no caso do loop, a este mesmo fluxo) — abriria a mesma classe de
+    // vazamento entre empresas do C1, só que via edição em vez de criação.
+    if (dto.agenteId) {
+      const agente = await this.prisma.agente.findFirst({
+        where: { id: dto.agenteId, empresaId },
+      });
+      if (!agente) {
+        throw new NotFoundException('Agente não encontrado nesta empresa');
+      }
+    }
+    if (dto.skillId) {
+      const skill = await this.prisma.skill.findFirst({
+        where: { id: dto.skillId, agente: { empresaId } },
+      });
+      if (!skill) {
+        throw new NotFoundException('Skill não encontrada nesta empresa');
+      }
+      const agenteDaEtapa = dto.agenteId ?? etapaAtual.agenteId;
+      if (skill.agenteId !== agenteDaEtapa) {
+        throw new BadRequestException(
+          'A skill selecionada não pertence ao agente desta etapa',
+        );
+      }
+    }
+    if (dto.loopParaEtapaId) {
+      await this.garantirEtapaDoFluxo(fluxo.id, dto.loopParaEtapaId);
+    }
+
     const tipo = dto.tipo ?? etapaAtual.tipo;
     let executor = dto.executor ?? etapaAtual.executor;
     if (!executorValido(tipo, executor)) executor = executorPadrao(tipo);

@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { FluxoService } from './fluxo.service';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { ModuloService } from '../modulo/modulo.service';
@@ -316,6 +316,8 @@ describe('FluxoService — Etapa', () => {
         findFirst: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
       },
+      agente: { findFirst: jest.fn() },
+      skill: { findFirst: jest.fn() },
     } as unknown as PrismaService;
     const moduloService = {
       findByIdInEmpresa: jest.fn().mockResolvedValue({ id: 'modulo-1' }),
@@ -416,6 +418,112 @@ describe('FluxoService — Etapa', () => {
         }),
       }),
     );
+  });
+
+  const etapaBase = {
+    id: 'e-1',
+    fluxoId: 'fluxo-1',
+    tipo: 'tarefa_agente' as const,
+    executor: 'agente' as const,
+    nome: 'X',
+    macroetapaId: 'me-1',
+    prazoDias: null,
+    agenteId: 'agente-1',
+    skillId: null,
+    autonomia: null,
+    aprovadores: [],
+    loopParaEtapaId: null,
+    entradaRefs: [],
+    camposUsuario: [],
+  };
+
+  it('rejeita um agenteId que não pertence a esta empresa', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue({
+      id: 'fluxo-1',
+      macroetapas: [],
+      etapas: [],
+    });
+    (prisma.etapa.findFirst as jest.Mock).mockResolvedValue(etapaBase);
+    (prisma.agente.findFirst as jest.Mock).mockResolvedValue(null);
+    const service = new FluxoService(prisma, moduloService);
+
+    await expect(
+      service.atualizarEtapa('modulo-1', 'empresa-1', 'e-1', {
+        agenteId: 'agente-de-outra-empresa',
+      }),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(prisma.agente.findFirst).toHaveBeenCalledWith({
+      where: { id: 'agente-de-outra-empresa', empresaId: 'empresa-1' },
+    });
+    expect(prisma.etapa.update).not.toHaveBeenCalled();
+  });
+
+  it('rejeita um skillId que não pertence a nenhum agente desta empresa', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue({
+      id: 'fluxo-1',
+      macroetapas: [],
+      etapas: [],
+    });
+    (prisma.etapa.findFirst as jest.Mock).mockResolvedValue(etapaBase);
+    (prisma.skill.findFirst as jest.Mock).mockResolvedValue(null);
+    const service = new FluxoService(prisma, moduloService);
+
+    await expect(
+      service.atualizarEtapa('modulo-1', 'empresa-1', 'e-1', {
+        skillId: 'skill-de-outra-empresa',
+      }),
+    ).rejects.toThrow(NotFoundException);
+    expect(prisma.etapa.update).not.toHaveBeenCalled();
+  });
+
+  it('rejeita uma skill que pertence a um agente diferente do agente desta etapa', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue({
+      id: 'fluxo-1',
+      macroetapas: [],
+      etapas: [],
+    });
+    (prisma.etapa.findFirst as jest.Mock).mockResolvedValue(etapaBase); // agenteId: 'agente-1'
+    (prisma.skill.findFirst as jest.Mock).mockResolvedValue({
+      id: 'skill-1',
+      agenteId: 'agente-2', // pertence a um agente diferente
+    });
+    const service = new FluxoService(prisma, moduloService);
+
+    await expect(
+      service.atualizarEtapa('modulo-1', 'empresa-1', 'e-1', {
+        skillId: 'skill-1',
+      }),
+    ).rejects.toThrow(BadRequestException);
+    expect(prisma.etapa.update).not.toHaveBeenCalled();
+  });
+
+  it('rejeita um loopParaEtapaId que pertence a uma etapa de outro fluxo', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue({
+      id: 'fluxo-1',
+      macroetapas: [],
+      etapas: [],
+    });
+    (prisma.etapa.findFirst as jest.Mock).mockImplementation(
+      ({ where }: { where: { id: string; fluxoId: string } }) => {
+        if (where.id === 'e-1' && where.fluxoId === 'fluxo-1') {
+          return Promise.resolve(etapaBase);
+        }
+        return Promise.resolve(null); // etapa de outro fluxo
+      },
+    );
+    const service = new FluxoService(prisma, moduloService);
+
+    await expect(
+      service.atualizarEtapa('modulo-1', 'empresa-1', 'e-1', {
+        loopParaEtapaId: 'etapa-de-outro-fluxo',
+      }),
+    ).rejects.toThrow(NotFoundException);
+    expect(prisma.etapa.update).not.toHaveBeenCalled();
   });
 
   it('excluir uma etapa limpa o loopParaEtapaId de quem apontava pra ela', async () => {
