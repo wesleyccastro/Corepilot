@@ -30,26 +30,80 @@ describe('Orquestrador BPM (motor de ponta a ponta + isolamento entre tenants)',
   });
 
   afterAll(async () => {
+    // Cada delete tem seu próprio try/catch (em vez de um único try/catch
+    // envolvendo a cadeia inteira) para que a falha de uma exclusão não
+    // impeça as demais de rodar — inclusive as últimas (usuario/empresa),
+    // que são exatamente as que não podem vazar num projeto Supabase
+    // compartilhado. Mesmo padrão de fonte-de-dados.e2e-spec.ts.
     try {
       // AuditLog referencia tanto Usuario (atorUsuarioId) quanto Empresa (empresaId)
       // sem cascade — precisa ser limpo antes de ambos, senão a exclusão de
       // usuario/empresa falha com violação de chave estrangeira.
       await prisma.auditLog.deleteMany({ where: { empresaId: { in: empresaIdsParaLimpar } } });
+    } catch (erro) {
+      console.warn('Falha ao limpar logs de auditoria de teste', erro);
+    }
+    try {
       await prisma.execucaoDeEtapa.deleteMany({ where: { instancia: { empresaId: { in: empresaIdsParaLimpar } } } });
+    } catch (erro) {
+      console.warn('Falha ao limpar execuções de etapa de teste', erro);
+    }
+    try {
       await prisma.instanciaDeProcesso.deleteMany({ where: { empresaId: { in: empresaIdsParaLimpar } } });
+    } catch (erro) {
+      console.warn('Falha ao limpar instâncias de processo de teste', erro);
+    }
+    try {
       await prisma.etapa.deleteMany({ where: { fluxo: { modulo: { empresaId: { in: empresaIdsParaLimpar } } } } });
+    } catch (erro) {
+      console.warn('Falha ao limpar etapas de teste', erro);
+    }
+    try {
       await prisma.macroetapa.deleteMany({ where: { fluxo: { modulo: { empresaId: { in: empresaIdsParaLimpar } } } } });
+    } catch (erro) {
+      console.warn('Falha ao limpar macroetapas de teste', erro);
+    }
+    try {
       await prisma.fluxo.deleteMany({ where: { modulo: { empresaId: { in: empresaIdsParaLimpar } } } });
+    } catch (erro) {
+      console.warn('Falha ao limpar fluxos de teste', erro);
+    }
+    try {
       await prisma.integracaoWhatsApp.deleteMany({ where: { empresaId: { in: empresaIdsParaLimpar } } });
+    } catch (erro) {
+      console.warn('Falha ao limpar integrações de WhatsApp de teste', erro);
+    }
+    try {
       await prisma.skill.deleteMany({ where: { agente: { empresaId: { in: empresaIdsParaLimpar } } } });
+    } catch (erro) {
+      console.warn('Falha ao limpar skills de teste', erro);
+    }
+    try {
       await prisma.agente.deleteMany({ where: { empresaId: { in: empresaIdsParaLimpar } } });
+    } catch (erro) {
+      console.warn('Falha ao limpar agentes de teste', erro);
+    }
+    try {
       await prisma.modulo.deleteMany({ where: { empresaId: { in: empresaIdsParaLimpar } } });
+    } catch (erro) {
+      console.warn('Falha ao limpar módulos de teste', erro);
+    }
+    try {
       await prisma.usuarioEmpresa.deleteMany({ where: { empresaId: { in: empresaIdsParaLimpar } } });
+    } catch (erro) {
+      console.warn('Falha ao limpar vínculos usuário-empresa de teste', erro);
+    }
+    try {
       await prisma.usuario.deleteMany({ where: { supabaseUserId: { in: authUserIdsParaLimpar } } });
+    } catch (erro) {
+      console.warn('Falha ao limpar usuários de teste', erro);
+    }
+    try {
       await prisma.empresa.deleteMany({ where: { id: { in: empresaIdsParaLimpar } } });
     } catch (erro) {
-      console.warn('Falha ao limpar dados de teste', erro);
+      console.warn('Falha ao limpar empresas de teste', erro);
     }
+
     await Promise.allSettled(authUserIdsParaLimpar.map((userId) => deleteTestUser(userId)));
     await app.close();
   });
