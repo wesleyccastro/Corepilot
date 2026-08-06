@@ -173,6 +173,20 @@ export class OrquestradorFilaWorker implements OnApplicationBootstrap {
   // updateMany lançar, removemos de novo — o Set nunca fica com um id que
   // nunca foi de fato nosso.
   private async reivindicarExecucao(execucaoId: string): Promise<boolean> {
+    // Uma tentativa PERDEDORA de reivindicar um id que já estava no Set antes
+    // desta chamada nunca pode remover esse id — ele já pertence
+    // legitimamente a OUTRA chamada em andamento (ex.: um tick anterior,
+    // sobreposto, ainda processando uma chamada externa lenta). Sem essa
+    // guarda: tick A reivindica 'exec-2' com sucesso (count: 1, id no Set) e
+    // segue processando; tick B tenta reivindicar o mesmo id, seu updateMany
+    // corretamente retorna count: 0 (a linha já está "processing", não mais
+    // "pending"), mas o "count === 0 -> delete" de B removeria do Set um id
+    // que é de A — e um sweep de travadas rodando entre esse delete de B e o
+    // finally de A veria 'exec-2' como "processing" e não reivindicado,
+    // marcando-a "failed" por engano (o mesmo falso positivo que este
+    // mecanismo existe para prevenir). Só quem efetivamente adicionou o id
+    // (jaEstavaNoSet === false) tem permissão de removê-lo de volta.
+    const jaEstavaNoSet = this.execucoesReivindicadas.has(execucaoId);
     this.execucoesReivindicadas.add(execucaoId);
     let resultado: { count: number };
     try {
@@ -181,83 +195,105 @@ export class OrquestradorFilaWorker implements OnApplicationBootstrap {
         data: { status: 'processing' },
       });
     } catch (erro) {
-      this.execucoesReivindicadas.delete(execucaoId);
+      if (!jaEstavaNoSet) {
+        this.execucoesReivindicadas.delete(execucaoId);
+      }
       throw erro;
     }
     if (resultado.count > 0) {
       return true;
     }
-    this.execucoesReivindicadas.delete(execucaoId);
+    if (!jaEstavaNoSet) {
+      this.execucoesReivindicadas.delete(execucaoId);
+    }
     return false;
   }
 
+  // Este método é o corpo inteiro de um tick de @Interval, chamado pelo
+  // @nestjs/schedule via um setInterval(target) puro — sem .catch() em
+  // lugar nenhum da biblioteca ou deste codebase, e sem um handler de
+  // 'unhandledRejection' registrado em main.ts. Uma rejeição não tratada
+  // aqui (ex.: um blip transitório do Supabase no recuperarExecucoesTravadas
+  // ou no findMany logo abaixo, ambos FORA do try/catch por execução do loop)
+  // derrubaria o processo Node inteiro — toda a API, não só o worker — e
+  // como este método roda a cada 5s, o processo cairia de novo assim que
+  // reiniciasse, ciclicamente, até o blip passar. O try/catch por execução
+  // dentro do for já cobre a falha de UMA execução; este try/catch externo é
+  // a rede de segurança pro resto do corpo do tick.
   @Interval(5000)
   async processarFilaAgentes(): Promise<void> {
-    await this.recuperarExecucoesTravadas('agente');
+    try {
+      await this.recuperarExecucoesTravadas('agente');
 
-    const pendentes = (await this.prisma.execucaoDeEtapa.findMany({
-      where: { status: 'pending', ator: 'agente' },
-      orderBy: { criadoEm: 'asc' },
-      take: 5,
-      include: {
-        instancia: true,
-        etapa: { include: { agente: true, skill: true } },
-      },
-    })) as ExecucaoDeAgente[];
+      const pendentes = (await this.prisma.execucaoDeEtapa.findMany({
+        where: { status: 'pending', ator: 'agente' },
+        orderBy: { criadoEm: 'asc' },
+        take: 5,
+        include: {
+          instancia: true,
+          etapa: { include: { agente: true, skill: true } },
+        },
+      })) as ExecucaoDeAgente[];
 
-    for (const execucao of pendentes) {
-      if (!(await this.reivindicarExecucao(execucao.id))) {
-        continue;
-      }
+      for (const execucao of pendentes) {
+        if (!(await this.reivindicarExecucao(execucao.id))) {
+          continue;
+        }
 
-      let processouComSucesso = false;
-      try {
-        await this.processarExecucaoDeAgente(execucao);
-        processouComSucesso = true;
-      } catch (erro) {
-        this.logger.error(
-          `Falha ao processar execução de agente ${execucao.id}`,
-          erro,
-        );
-        await this.prisma.execucaoDeEtapa.update({
-          where: { id: execucao.id },
-          data: {
-            status: 'failed',
-            mensagemErro: String(erro),
-            concluidoEm: new Date(),
-          },
-        });
-        await this.prisma.instanciaDeProcesso.update({
-          where: { id: execucao.instanciaId },
-          data: { status: 'erro' },
-        });
-      } finally {
-        // A partir daqui a linha não está mais em "processing" sob
-        // responsabilidade deste processo (virou "done" ou "failed") —
-        // sair do Set libera o sweep de travadas pra tratá-la normalmente
-        // caso ela volte a ficar presa em "processing" no futuro.
-        this.execucoesReivindicadas.delete(execucao.id);
-      }
-
-      // engine.avancar roda fora do try/catch acima de propósito: nesse ponto
-      // a execução já foi commitada como "done" com sua saída (agente
-      // concluiu com sucesso). Se avancar falhar, a execução em si continua
-      // "done" — só a instância fica travada — nunca sobrescrevemos um
-      // registro de auditoria bem-sucedido com "failed".
-      if (processouComSucesso) {
+        let processouComSucesso = false;
         try {
-          await this.engine.avancar(execucao.instanciaId, execucao.etapaId);
+          await this.processarExecucaoDeAgente(execucao);
+          processouComSucesso = true;
         } catch (erro) {
           this.logger.error(
-            `Execução de agente ${execucao.id} concluiu com sucesso, mas falhou ao avançar a instância`,
+            `Falha ao processar execução de agente ${execucao.id}`,
             erro,
           );
+          await this.prisma.execucaoDeEtapa.update({
+            where: { id: execucao.id },
+            data: {
+              status: 'failed',
+              mensagemErro: String(erro),
+              concluidoEm: new Date(),
+            },
+          });
           await this.prisma.instanciaDeProcesso.update({
             where: { id: execucao.instanciaId },
             data: { status: 'erro' },
           });
+        } finally {
+          // A partir daqui a linha não está mais em "processing" sob
+          // responsabilidade deste processo (virou "done" ou "failed") —
+          // sair do Set libera o sweep de travadas pra tratá-la normalmente
+          // caso ela volte a ficar presa em "processing" no futuro.
+          this.execucoesReivindicadas.delete(execucao.id);
+        }
+
+        // engine.avancar roda fora do try/catch acima de propósito: nesse ponto
+        // a execução já foi commitada como "done" com sua saída (agente
+        // concluiu com sucesso). Se avancar falhar, a execução em si continua
+        // "done" — só a instância fica travada — nunca sobrescrevemos um
+        // registro de auditoria bem-sucedido com "failed".
+        if (processouComSucesso) {
+          try {
+            await this.engine.avancar(execucao.instanciaId, execucao.etapaId);
+          } catch (erro) {
+            this.logger.error(
+              `Execução de agente ${execucao.id} concluiu com sucesso, mas falhou ao avançar a instância`,
+              erro,
+            );
+            await this.prisma.instanciaDeProcesso.update({
+              where: { id: execucao.instanciaId },
+              data: { status: 'erro' },
+            });
+          }
         }
       }
+    } catch (erro) {
+      this.logger.error(
+        'Falha inesperada no processamento da fila (agente)',
+        erro,
+      );
     }
   }
 
@@ -344,66 +380,78 @@ export class OrquestradorFilaWorker implements OnApplicationBootstrap {
     );
   }
 
+  // Mesma justificativa do try/catch externo de processarFilaAgentes: este
+  // método também é o corpo inteiro de um tick de @Interval sem nenhum
+  // .catch() a montante, então uma falha fora do try/catch por execução do
+  // loop (ex.: no recuperarExecucoesTravadas ou no findMany logo abaixo)
+  // seria uma unhandled rejection e derrubaria o processo inteiro a cada 5s.
   @Interval(5000)
   async processarFilaIntegracoes(): Promise<void> {
-    await this.recuperarExecucoesTravadas('integracao');
+    try {
+      await this.recuperarExecucoesTravadas('integracao');
 
-    const pendentes = (await this.prisma.execucaoDeEtapa.findMany({
-      where: { status: 'pending', ator: 'integracao' },
-      orderBy: { criadoEm: 'asc' },
-      take: 5,
-      include: { instancia: true, etapa: { include: { agente: true } } },
-    })) as ExecucaoDeIntegracao[];
+      const pendentes = (await this.prisma.execucaoDeEtapa.findMany({
+        where: { status: 'pending', ator: 'integracao' },
+        orderBy: { criadoEm: 'asc' },
+        take: 5,
+        include: { instancia: true, etapa: { include: { agente: true } } },
+      })) as ExecucaoDeIntegracao[];
 
-    for (const execucao of pendentes) {
-      if (!(await this.reivindicarExecucao(execucao.id))) {
-        continue;
-      }
+      for (const execucao of pendentes) {
+        if (!(await this.reivindicarExecucao(execucao.id))) {
+          continue;
+        }
 
-      let processouComSucesso = false;
-      try {
-        await this.processarExecucaoDeIntegracao(execucao);
-        processouComSucesso = true;
-      } catch (erro) {
-        this.logger.error(
-          `Falha ao processar execução de integração ${execucao.id}`,
-          erro,
-        );
-        await this.prisma.execucaoDeEtapa.update({
-          where: { id: execucao.id },
-          data: {
-            status: 'failed',
-            mensagemErro: String(erro),
-            concluidoEm: new Date(),
-          },
-        });
-        await this.prisma.instanciaDeProcesso.update({
-          where: { id: execucao.instanciaId },
-          data: { status: 'erro' },
-        });
-      } finally {
-        this.execucoesReivindicadas.delete(execucao.id);
-      }
-
-      // Mesmo padrão de processarFilaAgentes: engine.avancar roda fora do
-      // try/catch que marca falha. Nesse ponto a execução já foi commitada
-      // como "done" (envio ocorreu com sucesso). Se avancar falhar, só a
-      // instância fica travada em erro — nunca sobrescrevemos o registro de
-      // execução, já concluído, de volta para "failed".
-      if (processouComSucesso) {
+        let processouComSucesso = false;
         try {
-          await this.engine.avancar(execucao.instanciaId, execucao.etapaId);
+          await this.processarExecucaoDeIntegracao(execucao);
+          processouComSucesso = true;
         } catch (erro) {
           this.logger.error(
-            `Execução de integração ${execucao.id} concluiu com sucesso, mas falhou ao avançar a instância`,
+            `Falha ao processar execução de integração ${execucao.id}`,
             erro,
           );
+          await this.prisma.execucaoDeEtapa.update({
+            where: { id: execucao.id },
+            data: {
+              status: 'failed',
+              mensagemErro: String(erro),
+              concluidoEm: new Date(),
+            },
+          });
           await this.prisma.instanciaDeProcesso.update({
             where: { id: execucao.instanciaId },
             data: { status: 'erro' },
           });
+        } finally {
+          this.execucoesReivindicadas.delete(execucao.id);
+        }
+
+        // Mesmo padrão de processarFilaAgentes: engine.avancar roda fora do
+        // try/catch que marca falha. Nesse ponto a execução já foi commitada
+        // como "done" (envio ocorreu com sucesso). Se avancar falhar, só a
+        // instância fica travada em erro — nunca sobrescrevemos o registro de
+        // execução, já concluído, de volta para "failed".
+        if (processouComSucesso) {
+          try {
+            await this.engine.avancar(execucao.instanciaId, execucao.etapaId);
+          } catch (erro) {
+            this.logger.error(
+              `Execução de integração ${execucao.id} concluiu com sucesso, mas falhou ao avançar a instância`,
+              erro,
+            );
+            await this.prisma.instanciaDeProcesso.update({
+              where: { id: execucao.instanciaId },
+              data: { status: 'erro' },
+            });
+          }
         }
       }
+    } catch (erro) {
+      this.logger.error(
+        'Falha inesperada no processamento da fila (integração)',
+        erro,
+      );
     }
   }
 

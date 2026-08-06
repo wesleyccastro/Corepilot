@@ -292,6 +292,34 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
       data: { status: 'erro' },
     });
   });
+
+  it('não propaga uma falha inesperada fora do loop por execução (ex.: blip no recuperarExecucoesTravadas) — o tick não pode derrubar o processo', async () => {
+    const { prisma, anthropicService, engine, evolutionApi, config } =
+      buildDeps();
+    // @nestjs/schedule chama este método via setInterval puro, sem .catch();
+    // se esta rejeição escapasse, seria uma unhandled rejection derrubando a
+    // API inteira a cada 5s. O try/catch por execução dentro do for não
+    // protege esta falha porque ela acontece ANTES do loop, dentro do
+    // recuperarExecucoesTravadas.
+    (prisma.execucaoDeEtapa.findMany as jest.Mock).mockRejectedValueOnce(
+      new Error('Supabase indisponível'),
+    );
+    const worker = new OrquestradorFilaWorker(
+      prisma,
+      anthropicService,
+      engine,
+      evolutionApi,
+      config,
+    );
+    const erroSpy = jest.spyOn(worker['logger'], 'error');
+
+    await expect(worker.processarFilaAgentes()).resolves.toBeUndefined();
+
+    expect(erroSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Falha inesperada no processamento da fila'),
+      expect.any(Error),
+    );
+  });
 });
 
 describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
@@ -616,6 +644,51 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
     );
   });
 
+  it('não remove do Set um id que já pertencia a OUTRA chamada em andamento quando esta chamada perde a reivindicação (updateMany count: 0)', async () => {
+    const { prisma, anthropicService, engine, evolutionApi, config } =
+      buildDeps();
+    (prisma.execucaoDeEtapa.findMany as jest.Mock).mockResolvedValue([]);
+    const worker = new OrquestradorFilaWorker(
+      prisma,
+      anthropicService,
+      engine,
+      evolutionApi,
+      config,
+    );
+
+    // Simula tick A: reivindicou 'exec-2' com sucesso e ainda está
+    // processando (ex.: aguardando uma chamada externa lenta) — o id
+    // legitimamente pertence a essa chamada em andamento.
+    (prisma.execucaoDeEtapa.updateMany as jest.Mock).mockResolvedValueOnce({
+      count: 1,
+    });
+    const reivindicouA = await worker['reivindicarExecucao']('exec-2');
+    expect(reivindicouA).toBe(true);
+
+    // Tick B (uma execução sobreposta do @Interval) também tenta reivindicar
+    // o mesmo id — chega tarde, a linha já não está mais "pending", então seu
+    // updateMany retorna count: 0. Isso NÃO pode remover 'exec-2' do Set,
+    // porque A ainda não terminou de processar.
+    (prisma.execucaoDeEtapa.updateMany as jest.Mock).mockResolvedValueOnce({
+      count: 0,
+    });
+    const reivindicouB = await worker['reivindicarExecucao']('exec-2');
+    expect(reivindicouB).toBe(false);
+
+    // 'exec-2' deve continuar no Set (excluído do filtro de travadas) — se a
+    // tentativa perdedora de B tivesse removido, um sweep rodando agora
+    // marcaria 'exec-2' como travada e falha por engano, mesmo com A ainda
+    // legitimamente em andamento.
+    await worker['recuperarExecucoesTravadas']('integracao');
+    expect(prisma.execucaoDeEtapa.findMany).toHaveBeenCalledWith({
+      where: {
+        status: 'processing',
+        ator: 'integracao',
+        id: { notIn: ['exec-2'] },
+      },
+    });
+  });
+
   it('remove do Set uma reivindicação que não se confirmou (updateMany count: 0)', async () => {
     const { prisma, anthropicService, engine, evolutionApi, config } =
       buildDeps();
@@ -731,6 +804,29 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
     expect(prisma.instanciaDeProcesso.update).not.toHaveBeenCalled();
     expect(evolutionApi.enviarMensagem).not.toHaveBeenCalled();
     expect(engine.avancar).not.toHaveBeenCalled();
+  });
+
+  it('não propaga uma falha inesperada fora do loop por execução (ex.: blip no recuperarExecucoesTravadas) — o tick não pode derrubar o processo', async () => {
+    const { prisma, anthropicService, engine, evolutionApi, config } =
+      buildDeps();
+    (prisma.execucaoDeEtapa.findMany as jest.Mock).mockRejectedValueOnce(
+      new Error('Supabase indisponível'),
+    );
+    const worker = new OrquestradorFilaWorker(
+      prisma,
+      anthropicService,
+      engine,
+      evolutionApi,
+      config,
+    );
+    const erroSpy = jest.spyOn(worker['logger'], 'error');
+
+    await expect(worker.processarFilaIntegracoes()).resolves.toBeUndefined();
+
+    expect(erroSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Falha inesperada no processamento da fila'),
+      expect.any(Error),
+    );
   });
 });
 
