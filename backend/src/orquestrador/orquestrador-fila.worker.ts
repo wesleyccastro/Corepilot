@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Interval } from '@nestjs/schedule';
 import type {
@@ -44,15 +44,26 @@ function montarSystemPromptDaEtapa(agente: Agente, skill: Skill): string {
 }
 
 @Injectable()
-export class OrquestradorFilaWorker {
+export class OrquestradorFilaWorker implements OnApplicationBootstrap {
   private readonly logger = new Logger(OrquestradorFilaWorker.name);
 
-  // Tempo máximo que uma execução pode ficar em "processing" antes de ser
-  // considerada travada (ex.: o servidor reiniciou entre o envio externo e a
-  // gravação do "done"). Anthropic/Evolution respondem em segundos, não
-  // minutos, então 2 minutos já é uma folga generosa para uma tentativa
-  // legítima em andamento.
-  private readonly LIMITE_PROCESSING_MS = 2 * 60 * 1000;
+  // IDs de ExecucaoDeEtapa reivindicados por ESTE processo e ainda em
+  // andamento (entre reivindicarExecucao e o fim de
+  // processarExecucaoDeAgente/processarExecucaoDeIntegracao). Substitui o
+  // antigo limiar de tempo (LIMITE_PROCESSING_MS, medido a partir de
+  // criadoEm): aquele limiar disparava em tráfego saudável — nem a chamada
+  // Evolution API nem o SDK da Anthropic têm timeout explícito, então uma
+  // tentativa lenta-mas-bem-sucedida podia passar de 2 minutos facilmente, e
+  // o relógio começava em criadoEm (criação da linha), não em quando ela foi
+  // de fato reivindicada, então um backlog de linhas "pending" podia cruzar o
+  // limiar antes mesmo de começar a ser processado. Com este Set, uma linha
+  // "processing" que não está nele não pode ser uma tentativa legítima em
+  // andamento NESTE processo — e como este worker é o único processo que
+  // reivindica execuções, ela só pode ser resquício de uma instância anterior
+  // do processo que caiu no meio do processamento. Não precisa de limiar de
+  // tempo: a idade da linha é irrelevante, só importa se alguém está com ela
+  // "na mão" agora.
+  private readonly execucoesReivindicadas = new Set<string>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -62,6 +73,19 @@ export class OrquestradorFilaWorker {
     private readonly config: ConfigService,
   ) {}
 
+  // Sweep de partida: roda uma única vez, na subida da aplicação. O Set
+  // execucoesReivindicadas está garantidamente vazio neste momento (o
+  // processo acabou de começar a existir), então TODA linha "processing"
+  // encontrada aqui é necessariamente resquício de uma instância anterior do
+  // processo — não há como este processo, que ainda não reivindicou nada, ter
+  // sido o autor dela. Reaproveita a mesma recuperarExecucoesTravadas usada
+  // pelo sweep periódico: sem limiar de tempo, o comportamento já é
+  // "recupera tudo que não está no Set", que é exatamente o que se quer aqui.
+  async onApplicationBootstrap(): Promise<void> {
+    await this.recuperarExecucoesTravadas('agente');
+    await this.recuperarExecucoesTravadas('integracao');
+  }
+
   // Recuperação de execuções travadas: se o processo cair depois de reivindicar
   // uma execução (status "processing") mas antes de gravar o resultado final
   // ("done"/"failed"), a linha nunca mais seria reprocessada — o polling só
@@ -69,18 +93,25 @@ export class OrquestradorFilaWorker {
   // vez de deixá-la travada silenciosamente para sempre. Não tentamos reenviar
   // automaticamente: não há como saber com segurança se o envio externo já
   // aconteceu antes da queda.
+  //
+  // Só varremos linhas "processing" que NÃO estão em execucoesReivindicadas:
+  // essas são as que este processo tem ativamente em mãos agora, então não
+  // estão travadas — estão em andamento. Qualquer outra linha "processing" é
+  // órfã (reivindicada por uma instância anterior deste processo que caiu, ou
+  // pelo próprio processo mas de uma execução que já terminou de processar —
+  // caso em que ela não estaria mais em "processing" de qualquer forma).
   private async recuperarExecucoesTravadas(ator: AtorExecucao): Promise<void> {
     const travadas = await this.prisma.execucaoDeEtapa.findMany({
       where: {
         status: 'processing',
         ator,
-        criadoEm: { lt: new Date(Date.now() - this.LIMITE_PROCESSING_MS) },
+        id: { notIn: [...this.execucoesReivindicadas] },
       },
     });
 
     for (const execucao of travadas) {
       this.logger.error(
-        `Execução ${execucao.id} está travada em "processing" há mais de ${this.LIMITE_PROCESSING_MS}ms — marcando como falha para revisão manual`,
+        `Execução ${execucao.id} está travada em "processing" (nenhum processo ativo a reivindica) — marcando como falha para revisão manual`,
       );
       // Mesma guarda condicional de reivindicarExecucao: só marcamos "failed"
       // se a linha ainda estiver "processing" no momento desta escrita. Sem
@@ -119,7 +150,11 @@ export class OrquestradorFilaWorker {
       where: { id: execucaoId, status: 'pending' },
       data: { status: 'processing' },
     });
-    return resultado.count > 0;
+    if (resultado.count > 0) {
+      this.execucoesReivindicadas.add(execucaoId);
+      return true;
+    }
+    return false;
   }
 
   @Interval(5000)
@@ -162,6 +197,12 @@ export class OrquestradorFilaWorker {
           where: { id: execucao.instanciaId },
           data: { status: 'erro' },
         });
+      } finally {
+        // A partir daqui a linha não está mais em "processing" sob
+        // responsabilidade deste processo (virou "done" ou "failed") —
+        // sair do Set libera o sweep de travadas pra tratá-la normalmente
+        // caso ela volte a ficar presa em "processing" no futuro.
+        this.execucoesReivindicadas.delete(execucao.id);
       }
 
       // engine.avancar roda fora do try/catch acima de propósito: nesse ponto
@@ -238,7 +279,16 @@ export class OrquestradorFilaWorker {
 
       await tx.instanciaDeProcesso.update({
         where: { id: execucao.instanciaId },
-        data: { dadosAcumulados: dadosAcumulados as Prisma.InputJsonValue },
+        data: {
+          dadosAcumulados: dadosAcumulados as Prisma.InputJsonValue,
+          // Se um sweep de travadas anterior tiver marcado esta instância como
+          // "erro" por engano (falso positivo — a execução acabou de terminar
+          // com sucesso), este write a resgata de volta pra "em_andamento" em
+          // vez de deixá-la presa mostrando uma falha que já não existe.
+          // `avancar`, logo abaixo, é quem eventualmente marca "concluido" se
+          // for o caso — sobrescrevendo este valor, não o contrário.
+          status: 'em_andamento',
+        },
       });
     });
   }
@@ -292,6 +342,8 @@ export class OrquestradorFilaWorker {
           where: { id: execucao.instanciaId },
           data: { status: 'erro' },
         });
+      } finally {
+        this.execucoesReivindicadas.delete(execucao.id);
       }
 
       // Mesmo padrão de processarFilaAgentes: engine.avancar roda fora do
@@ -363,10 +415,11 @@ export class OrquestradorFilaWorker {
     );
 
     // Mesma justificativa do commit de processarExecucaoDeAgente: a marcação
-    // de "done" com a saída é a única escrita do caminho de sucesso aqui,
-    // mas fica dentro de uma transação por consistência com o restante do
-    // worker e para blindar contra futuras escritas relacionadas que venham
-    // a ser adicionadas a esse caminho.
+    // de "done" com a saída fica dentro de uma transação por consistência com
+    // o restante do worker. Também reseta a instância pra "em_andamento" pelo
+    // mesmo motivo do agente: um sweep de travadas anterior pode tê-la
+    // marcado "erro" por engano enquanto este envio, na verdade bem-sucedido,
+    // ainda estava em voo.
     await this.prisma.$transaction(async (tx) => {
       await tx.execucaoDeEtapa.update({
         where: { id: execucao.id },
@@ -378,6 +431,10 @@ export class OrquestradorFilaWorker {
           },
           concluidoEm: new Date(),
         },
+      });
+      await tx.instanciaDeProcesso.update({
+        where: { id: execucao.instanciaId },
+        data: { status: 'em_andamento' },
       });
     });
   }
