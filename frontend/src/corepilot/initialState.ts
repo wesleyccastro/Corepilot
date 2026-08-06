@@ -30,7 +30,7 @@ import type { Agente, CampoSaida, Skill as SkillReal } from './agentes/types';
 import type { FonteDeDados } from './fontes-de-dados/types';
 import type { Consulta, ResultadoTeste } from './consultas/types';
 import type { Conversa, ConversaTag, Mensagem, Modulo } from './modulos/types';
-import type { AcaoEtapa, Fluxo, InstanciaDeProcesso, InstanciaDetalhe, IntegracaoWhatsApp, TipoCampoEtapa } from './orquestrador/types';
+import type { AcaoEtapa, Fluxo, InstanciaDetalhe, InstanciaResumo, IntegracaoWhatsApp, TipoCampoEtapa } from './orquestrador/types';
 import {
   emptyAgentIdentityForm,
   emptyEditFonteForm,
@@ -205,7 +205,7 @@ export interface CorePilotState {
   orchestratorNewFieldType: TipoCampoEtapa;
   orchestratorNewFieldRequired: boolean;
 
-  moduloInstancias: InstanciaDeProcesso[];
+  moduloInstancias: InstanciaResumo[];
   instanciasLoading: boolean;
   instanciaDetalhe: InstanciaDetalhe | null;
   instanciaDetalheLoading: boolean;
@@ -218,6 +218,8 @@ export interface CorePilotState {
   skillTestando: boolean;
   skillTestResultado: { saida: Record<string, unknown>; tokensEntrada: number | null; tokensSaida: number | null } | null;
   skillTestErro: string | null;
+
+  moduloWorkspaceTab: 'chat' | 'interacao';
 
   moduloConversaId: string | null;
   moduloMensagens: Mensagem[];
@@ -503,6 +505,8 @@ export function createInitialState(): CorePilotState {
     skillTestando: false,
     skillTestResultado: null,
     skillTestErro: null,
+
+    moduloWorkspaceTab: 'chat',
 
     moduloConversaId: null,
     moduloMensagens: [],

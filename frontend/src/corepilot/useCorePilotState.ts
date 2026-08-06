@@ -72,7 +72,6 @@ export function useCorePilotState(accessToken: string) {
   const moduleTimers = useRef<Record<string, number | undefined>>({});
   const knowledgeIndexTimer = useRef<number | undefined>(undefined);
   const generalKnowledgeIndexTimer = useRef<number | undefined>(undefined);
-  const waTestTimer = useRef<number | undefined>(undefined);
   const dsTestTimer = useRef<number | undefined>(undefined);
 
   const comprasScrollRef = useRef<HTMLDivElement>(null);
@@ -581,15 +580,6 @@ export function useCorePilotState(accessToken: string) {
   const updateWaNewKey = (e: ChangeEvent<HTMLInputElement>) => update({ waNewKey: e.target.value });
   const toggleWaNotifyTasks = () => update((s) => ({ waNotifyTasks: !s.waNotifyTasks }));
   const setAdminSettingsTab = (tab: 'integrations' | 'knowledge') => update({ adminSettingsTab: tab });
-
-  const testWaConnection = () => {
-    window.clearTimeout(waTestTimer.current);
-    update({ waConnectionState: 'testing', waExpanded: true });
-    waTestTimer.current = window.setTimeout(() => {
-      update({ waConnectionState: 'connected', waLastTestMsg: 'Instância respondeu · sessão do WhatsApp ativa', waChangingKey: false });
-      showToast('Conexão com o Evolution API estabelecida.');
-    }, 1300);
-  };
 
   const toggleDsExpanded = () => update((s) => ({ dsExpanded: !s.dsExpanded, dsMenuOpen: false }));
   const toggleDsMenu = () => update((s) => ({ dsMenuOpen: !s.dsMenuOpen }));
@@ -1224,6 +1214,8 @@ export function useCorePilotState(accessToken: string) {
     }
   };
 
+  const setModuloWorkspaceTab = (tab: CorePilotState['moduloWorkspaceTab']) => update({ moduloWorkspaceTab: tab });
+
   // --- Instâncias reais (Interação/Kanban) ---
   const carregarInstanciasDoModulo = async (moduloId: string) => {
     update({ instanciasLoading: true });
@@ -1318,6 +1310,10 @@ export function useCorePilotState(accessToken: string) {
     } catch (err) {
       update({ waConnectionState: 'disconnected', waLastTestMsg: err instanceof Error ? err.message : 'Erro ao testar conexão' });
     }
+  };
+  const salvarETestarWaConnection = async () => {
+    await salvarIntegracaoWhatsAppReal();
+    await testarIntegracaoWhatsAppReal();
   };
 
   // --- Testar skill real ---
@@ -1594,7 +1590,8 @@ export function useCorePilotState(accessToken: string) {
     goAdminUsers, goAdminSettings, openGeneralSettings, openCompanySettings, backFromAdmin, setAdminTab,
     toggleUserMenu, closeUserMenu, openUsersFromMenu,
     abrirConfirmacao, fecharConfirmacao, confirmarAcaoPendente, goAdminModulos, alternarStatusModulo,
-    updateWaField, toggleWaExpanded, toggleChangeWaKey, updateWaNewKey, toggleWaNotifyTasks, setAdminSettingsTab, testWaConnection,
+    updateWaField, toggleWaExpanded, toggleChangeWaKey, updateWaNewKey, toggleWaNotifyTasks, setAdminSettingsTab,
+    testWaConnection: salvarETestarWaConnection,
     toggleDsExpanded, toggleDsMenu, toggleQueriesSection, toggleSemanticSection, editConnectionFromMenu,
     updateDsField, toggleChangePassword, updateDsNewPassword, testConnection,
     toggleQueryExpand, toggleQueryMenu, closeQueryMenu, testQuery, removeQuery, toggleNewQueryForm, updateNewQueryField, saveNewQuery,
@@ -1623,6 +1620,7 @@ export function useCorePilotState(accessToken: string) {
     updateOrchestratorNewFieldLabel, updateOrchestratorNewFieldType, toggleOrchestratorNewFieldRequired,
     adicionarCampoUsuarioSelecionado, removerCampoUsuarioSelecionado, toggleEntradaRefSelecionada,
     publicarFluxoReal,
+    setModuloWorkspaceTab,
     carregarInstanciasDoModulo, carregarDetalheInstancia, abrirCardInstancia, fecharCardInstancia,
     iniciarAcaoInstancia, updateCardActionPromptValor, cancelarAcaoInstancia, confirmarCardActionPrompt,
     carregarIntegracaoWhatsApp, salvarIntegracaoWhatsAppReal, testarIntegracaoWhatsAppReal,

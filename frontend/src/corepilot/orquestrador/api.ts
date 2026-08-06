@@ -1,7 +1,7 @@
 import { apiFetch } from '../api/apiFetch';
 import type {
   AcaoEtapa, CustomFieldEtapa, Etapa, ExecutorEtapa, Fluxo, InstanciaDeProcesso,
-  InstanciaDetalhe, IntegracaoWhatsApp, Macroetapa, TipoEtapa,
+  InstanciaDetalhe, InstanciaResumo, IntegracaoWhatsApp, Macroetapa, TipoEtapa,
 } from './types';
 
 export async function obterFluxo(accessToken: string, moduloId: string): Promise<Fluxo> {
@@ -88,10 +88,10 @@ export async function criarInstancia(accessToken: string, moduloId: string, dado
   return (await response.json()) as InstanciaDeProcesso;
 }
 
-export async function listarInstancias(accessToken: string, moduloId: string): Promise<InstanciaDeProcesso[]> {
+export async function listarInstancias(accessToken: string, moduloId: string): Promise<InstanciaResumo[]> {
   const response = await apiFetch(`/modulos/${moduloId}/fluxo/instancias`, accessToken);
   if (!response.ok) throw new Error(`Falha ao listar instâncias (status ${response.status})`);
-  return (await response.json()) as InstanciaDeProcesso[];
+  return (await response.json()) as InstanciaResumo[];
 }
 
 export async function detalharInstancia(accessToken: string, instanciaId: string): Promise<InstanciaDetalhe> {

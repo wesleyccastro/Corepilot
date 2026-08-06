@@ -76,6 +76,12 @@ export interface InstanciaDeProcesso {
   atualizadoEm: string;
 }
 
+export interface InstanciaResumo extends InstanciaDeProcesso {
+  etapaAtualNome: string;
+  macroetapaAtualId: string;
+  macroetapaAtualNome: string;
+}
+
 export type StatusExecucao = 'pending' | 'processing' | 'done' | 'failed';
 export type AtorExecucao = 'agente' | 'usuario' | 'integracao' | 'automatico';
 
