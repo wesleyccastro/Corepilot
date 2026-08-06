@@ -17,6 +17,7 @@ import { ConsultaTesteModule } from './consulta/consulta-teste.module';
 import { SyncCronModule } from './consulta/sync-cron.module';
 import { FerramentaModule } from './skill/ferramenta.module';
 import { OrquestradorModule } from './orquestrador/orquestrador.module';
+import { IntegracaoWhatsAppModule } from './integracao-whatsapp/integracao-whatsapp.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { OrquestradorModule } from './orquestrador/orquestrador.module';
     SyncCronModule,
     FerramentaModule,
     OrquestradorModule,
+    IntegracaoWhatsAppModule,
   ],
   controllers: [AppController],
   providers: [AppService],
