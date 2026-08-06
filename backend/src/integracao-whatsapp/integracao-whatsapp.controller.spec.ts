@@ -17,4 +17,26 @@ describe('IntegracaoWhatsAppController', () => {
 
     expect(resultado).not.toHaveProperty('apiKeyCriptografada');
   });
+
+  it('nunca devolve apiKeyCriptografada ao salvar', async () => {
+    const service = {
+      salvar: jest.fn().mockResolvedValue({ id: 'wa-1', apiUrl: 'x', instanceName: 'y', apiKeyCriptografada: 'zzz', phone: null }),
+    } as unknown as IntegracaoWhatsAppService;
+    const controller = new IntegracaoWhatsAppController(service, buildTenantContext());
+
+    const resultado = await controller.salvar({ apiUrl: 'x', instanceName: 'y', apiKey: 'segredo' });
+
+    expect(resultado).not.toHaveProperty('apiKeyCriptografada');
+  });
+
+  it('nunca devolve apiKeyCriptografada ao testar', async () => {
+    const service = {
+      testar: jest.fn().mockResolvedValue({ id: 'wa-1', apiUrl: 'x', instanceName: 'y', apiKeyCriptografada: 'zzz', phone: null }),
+    } as unknown as IntegracaoWhatsAppService;
+    const controller = new IntegracaoWhatsAppController(service, buildTenantContext());
+
+    const resultado = await controller.testar();
+
+    expect(resultado).not.toHaveProperty('apiKeyCriptografada');
+  });
 });

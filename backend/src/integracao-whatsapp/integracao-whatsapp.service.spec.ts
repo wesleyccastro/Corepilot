@@ -31,6 +31,29 @@ describe('IntegracaoWhatsAppService', () => {
     expect(descriptografar(resultado.apiKeyCriptografada as string, CHAVE)).toBe('segredo');
   });
 
+  it('reaproveita a apiKeyCriptografada existente ao atualizar sem enviar apiKey', async () => {
+    const { prisma, config, evolutionApi } = buildDeps();
+    const apiKeyCriptografadaExistente = criptografar('chave-atual', CHAVE);
+    (prisma.integracaoWhatsApp.findUnique as jest.Mock).mockResolvedValue({
+      empresaId: 'empresa-1',
+      apiUrl: 'https://x.com',
+      instanceName: 'corepilot',
+      apiKeyCriptografada: apiKeyCriptografadaExistente,
+    });
+    (prisma.integracaoWhatsApp.upsert as jest.Mock).mockImplementation(({ update }: { update: Record<string, unknown> }) =>
+      Promise.resolve({ id: 'wa-1', ...update }),
+    );
+    const service = new IntegracaoWhatsAppService(prisma, config, evolutionApi);
+
+    await service.salvar('empresa-1', { apiUrl: 'https://novo.com', instanceName: 'corepilot' });
+
+    expect(prisma.integracaoWhatsApp.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ apiKeyCriptografada: apiKeyCriptografadaExistente }),
+      }),
+    );
+  });
+
   it('rejeita salvar sem apiKey quando ainda não existe configuração', async () => {
     const { prisma, config, evolutionApi } = buildDeps();
     (prisma.integracaoWhatsApp.findUnique as jest.Mock).mockResolvedValue(null);
