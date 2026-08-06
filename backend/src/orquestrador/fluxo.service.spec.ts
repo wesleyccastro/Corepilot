@@ -501,6 +501,36 @@ describe('FluxoService — Etapa', () => {
     expect(prisma.etapa.update).not.toHaveBeenCalled();
   });
 
+  it('rejeita agenteId: null + skillId do agente ATUAL da etapa (C2: precisa comparar contra o agente RESULTANTE, não o antigo)', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue({
+      id: 'fluxo-1',
+      macroetapas: [],
+      etapas: [],
+    });
+    (prisma.etapa.findFirst as jest.Mock).mockResolvedValue(etapaBase); // agenteId atual: 'agente-1'
+    (prisma.skill.findFirst as jest.Mock).mockResolvedValue({
+      id: 'skill-do-agente-1',
+      agenteId: 'agente-1', // pertence justamente ao agente ATUAL (antigo) da etapa
+    });
+    const service = new FluxoService(prisma, moduloService);
+
+    // Com `??` em vez de `=== undefined`, `dto.agenteId ?? etapaAtual.agenteId`
+    // resolveria pra 'agente-1' (null é coalescido) e este payload passaria
+    // a validação por engano — mas o write, à parte, gravaria agenteId: null,
+    // deixando a etapa com uma skill vinculada a um agente null. A forma
+    // correta (`=== undefined`) resolve agenteDaEtapa pra `null` aqui (o
+    // valor RESULTANTE após esta atualização), e skill.agenteId !== null
+    // rejeita corretamente.
+    await expect(
+      service.atualizarEtapa('modulo-1', 'empresa-1', 'e-1', {
+        agenteId: null,
+        skillId: 'skill-do-agente-1',
+      }),
+    ).rejects.toThrow(BadRequestException);
+    expect(prisma.etapa.update).not.toHaveBeenCalled();
+  });
+
   it('rejeita um loopParaEtapaId que pertence a uma etapa de outro fluxo', async () => {
     const { prisma, moduloService } = buildDeps();
     (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue({
