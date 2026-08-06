@@ -30,6 +30,7 @@ import type { Agente, CampoSaida, Skill as SkillReal } from './agentes/types';
 import type { FonteDeDados } from './fontes-de-dados/types';
 import type { Consulta, ResultadoTeste } from './consultas/types';
 import type { Conversa, ConversaTag, Mensagem, Modulo } from './modulos/types';
+import type { AcaoEtapa, Fluxo, InstanciaDeProcesso, InstanciaDetalhe, IntegracaoWhatsApp, TipoCampoEtapa } from './orquestrador/types';
 import {
   emptyAgentIdentityForm,
   emptyEditFonteForm,
@@ -193,6 +194,24 @@ export interface CorePilotState {
   showNovaConsultaForm: boolean;
   testandoConsultaId: string | null;
   resultadosTesteConsulta: Record<string, ResultadoTeste>;
+
+  moduloFluxo: Fluxo | null;
+  fluxoLoading: boolean;
+  orchestratorSelectedEtapaId: string | null;
+  orchestratorNovaMacroetapaAberta: boolean;
+  orchestratorNovaMacroetapaNome: string;
+  orchestratorNewApprover: string;
+  orchestratorNewFieldLabel: string;
+  orchestratorNewFieldType: TipoCampoEtapa;
+  orchestratorNewFieldRequired: boolean;
+
+  moduloInstancias: InstanciaDeProcesso[];
+  instanciasLoading: boolean;
+  instanciaDetalhe: InstanciaDetalhe | null;
+  instanciaDetalheLoading: boolean;
+  cardActionPrompt: { acao: AcaoEtapa; valor: string } | null;
+
+  integracaoWhatsApp: IntegracaoWhatsApp | null;
 
   skillTestSelecionadaId: string | null;
   skillTestEntrada: string;
@@ -460,6 +479,24 @@ export function createInitialState(): CorePilotState {
     showNovaConsultaForm: false,
     testandoConsultaId: null,
     resultadosTesteConsulta: {},
+
+    moduloFluxo: null,
+    fluxoLoading: false,
+    orchestratorSelectedEtapaId: null,
+    orchestratorNovaMacroetapaAberta: false,
+    orchestratorNovaMacroetapaNome: '',
+    orchestratorNewApprover: '',
+    orchestratorNewFieldLabel: '',
+    orchestratorNewFieldType: 'text',
+    orchestratorNewFieldRequired: false,
+
+    moduloInstancias: [],
+    instanciasLoading: false,
+    instanciaDetalhe: null,
+    instanciaDetalheLoading: false,
+    cardActionPrompt: null,
+
+    integracaoWhatsApp: null,
 
     skillTestSelecionadaId: null,
     skillTestEntrada: '',

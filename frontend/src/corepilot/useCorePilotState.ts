@@ -50,6 +50,14 @@ import { criarTag, listarTags, removerTag } from './modulos/tags-api';
 import { emptyAgentIdentityForm, emptyEditFonteForm, emptyNovaConsultaForm, emptyNovaFonteForm, emptyNovoAgenteForm, type AgentIdentityForm } from './types';
 import type { Agente, CampoSaida, Skill as SkillReal } from './agentes/types';
 import type { Consulta } from './consultas/types';
+import {
+  obterFluxo, criarMacroetapa,
+  criarEtapa, atualizarEtapa as atualizarEtapaApi, excluirEtapa as excluirEtapaApi, publicarFluxo,
+  listarInstancias, detalharInstancia, executarAcao as executarAcaoApi,
+  obterIntegracaoWhatsApp, salvarIntegracaoWhatsApp as salvarIntegracaoWhatsAppApi, testarIntegracaoWhatsApp as testarIntegracaoWhatsAppApi,
+  type AtualizarEtapaDto,
+} from './orquestrador/api';
+import type { AcaoEtapa, CustomFieldEtapa, TipoCampoEtapa } from './orquestrador/types';
 
 type Patch = Partial<CorePilotState> | ((s: CorePilotState) => Partial<CorePilotState> | null);
 type ChatListKey = 'comprasChats' | 'financeiroChats';
@@ -291,6 +299,7 @@ export function useCorePilotState(accessToken: string) {
     instructions: '',
     moduloAgentes: [], selectedAgenteId: null, agenteSkills: [],
     moduloConsultas: [],
+    moduloFluxo: null, orchestratorSelectedEtapaId: null,
     agentTab: 'identity' as const,
   });
   const editModule = (viewName: ViewId) => {
@@ -339,6 +348,7 @@ export function useCorePilotState(accessToken: string) {
     });
     void carregarAgentesDoModulo(modulo.id);
     void carregarConsultasDoModulo(modulo.id);
+    void carregarFluxoDoModulo(modulo.id);
   };
   const editComprasModule = () => editModule('compras');
   const editFinanceiroModule = () => editModule('financeiro');
@@ -1054,6 +1064,262 @@ export function useCorePilotState(accessToken: string) {
     update((s) => ({ moduloConsultas: s.moduloConsultas.map((c) => (c.id === atualizada.id ? atualizada : c)) }));
   };
 
+  // --- Orquestrador (Fluxo/Etapa/Instâncias) reais ---
+  const carregarFluxoDoModulo = async (moduloId: string) => {
+    update({ fluxoLoading: true });
+    try {
+      const fluxo = await obterFluxo(accessToken, moduloId);
+      update({ fluxoLoading: false, moduloFluxo: fluxo });
+    } catch (err) {
+      update({ fluxoLoading: false, wizardError: err instanceof Error ? err.message : 'Erro ao carregar o fluxo' });
+    }
+  };
+
+  const selecionarEtapaOrquestrador = (etapaId: string) => update({ orchestratorSelectedEtapaId: etapaId });
+  const fecharPainelOrquestrador = () => update({ orchestratorSelectedEtapaId: null });
+
+  const toggleNovaMacroetapaForm = () => update((s) => ({
+    orchestratorNovaMacroetapaAberta: !s.orchestratorNovaMacroetapaAberta,
+    orchestratorNovaMacroetapaNome: '',
+  }));
+  const updateNovaMacroetapaNome = (e: ChangeEvent<HTMLInputElement>) => update({ orchestratorNovaMacroetapaNome: e.target.value });
+  const criarMacroetapaReal = async (): Promise<string | null> => {
+    const moduloId = state.currentModuloId;
+    const nome = state.orchestratorNovaMacroetapaNome.trim();
+    if (!moduloId || !nome || !state.moduloFluxo) return null;
+    try {
+      const macroetapa = await criarMacroetapa(accessToken, moduloId, nome);
+      update((s) => ({
+        moduloFluxo: s.moduloFluxo ? { ...s.moduloFluxo, macroetapas: [...s.moduloFluxo.macroetapas, macroetapa] } : s.moduloFluxo,
+        orchestratorNovaMacroetapaAberta: false,
+        orchestratorNovaMacroetapaNome: '',
+      }));
+      return macroetapa.id;
+    } catch (err) {
+      update({ wizardError: err instanceof Error ? err.message : 'Erro ao criar coluna' });
+      return null;
+    }
+  };
+
+  const criarEtapaOrquestradorReal = async () => {
+    const moduloId = state.currentModuloId;
+    const fluxo = state.moduloFluxo;
+    if (!moduloId || !fluxo) return;
+    const macroetapaId = fluxo.macroetapas[0]?.id;
+    if (!macroetapaId) {
+      update({ wizardError: 'Crie pelo menos uma coluna do Kanban antes de adicionar uma etapa.' });
+      return;
+    }
+    try {
+      const etapa = await criarEtapa(accessToken, moduloId, { nome: 'Nova etapa', tipo: 'tarefa_agente', macroetapaId });
+      update((s) => ({
+        moduloFluxo: s.moduloFluxo ? { ...s.moduloFluxo, etapas: [...s.moduloFluxo.etapas, etapa] } : s.moduloFluxo,
+        orchestratorSelectedEtapaId: etapa.id,
+      }));
+    } catch (err) {
+      update({ wizardError: err instanceof Error ? err.message : 'Erro ao criar etapa' });
+    }
+  };
+
+  const atualizarEtapaOrquestradorReal = async (etapaId: string, patch: AtualizarEtapaDto) => {
+    const moduloId = state.currentModuloId;
+    if (!moduloId) return;
+    try {
+      const etapa = await atualizarEtapaApi(accessToken, moduloId, etapaId, patch);
+      update((s) => ({
+        moduloFluxo: s.moduloFluxo
+          ? { ...s.moduloFluxo, etapas: s.moduloFluxo.etapas.map((e) => (e.id === etapaId ? etapa : e)) }
+          : s.moduloFluxo,
+      }));
+    } catch (err) {
+      update({ wizardError: err instanceof Error ? err.message : 'Erro ao atualizar etapa' });
+    }
+  };
+
+  const excluirEtapaOrquestradorReal = async (etapaId: string) => {
+    const moduloId = state.currentModuloId;
+    if (!moduloId) return;
+    try {
+      await excluirEtapaApi(accessToken, moduloId, etapaId);
+      update((s) => ({
+        moduloFluxo: s.moduloFluxo
+          ? {
+              ...s.moduloFluxo,
+              etapas: s.moduloFluxo.etapas
+                .filter((e) => e.id !== etapaId)
+                .map((e) => (e.loopParaEtapaId === etapaId ? { ...e, loopParaEtapaId: null } : e)),
+            }
+          : s.moduloFluxo,
+        orchestratorSelectedEtapaId: s.orchestratorSelectedEtapaId === etapaId ? null : s.orchestratorSelectedEtapaId,
+      }));
+    } catch (err) {
+      update({ wizardError: err instanceof Error ? err.message : 'Erro ao excluir etapa' });
+    }
+  };
+  const excluirEtapaOrquestradorSelecionada = () => {
+    if (state.orchestratorSelectedEtapaId) void excluirEtapaOrquestradorReal(state.orchestratorSelectedEtapaId);
+  };
+
+  const updateOrchestratorNewApprover = (e: ChangeEvent<HTMLInputElement>) => update({ orchestratorNewApprover: e.target.value });
+  const adicionarAprovadorSelecionado = () => {
+    const etapaId = state.orchestratorSelectedEtapaId;
+    const etapa = state.moduloFluxo?.etapas.find((e) => e.id === etapaId);
+    const nome = state.orchestratorNewApprover.trim();
+    if (!etapaId || !etapa || !nome) return;
+    void atualizarEtapaOrquestradorReal(etapaId, { aprovadores: [...etapa.aprovadores, nome] });
+    update({ orchestratorNewApprover: '' });
+  };
+  const removerAprovadorSelecionado = (nome: string) => {
+    const etapaId = state.orchestratorSelectedEtapaId;
+    const etapa = state.moduloFluxo?.etapas.find((e) => e.id === etapaId);
+    if (!etapaId || !etapa) return;
+    void atualizarEtapaOrquestradorReal(etapaId, { aprovadores: etapa.aprovadores.filter((a) => a !== nome) });
+  };
+
+  const updateOrchestratorNewFieldLabel = (e: ChangeEvent<HTMLInputElement>) => update({ orchestratorNewFieldLabel: e.target.value });
+  const updateOrchestratorNewFieldType = (e: ChangeEvent<HTMLSelectElement>) =>
+    update({ orchestratorNewFieldType: e.target.value as TipoCampoEtapa });
+  const toggleOrchestratorNewFieldRequired = () => update((s) => ({ orchestratorNewFieldRequired: !s.orchestratorNewFieldRequired }));
+  const adicionarCampoUsuarioSelecionado = () => {
+    const etapaId = state.orchestratorSelectedEtapaId;
+    const etapa = state.moduloFluxo?.etapas.find((e) => e.id === etapaId);
+    const label = state.orchestratorNewFieldLabel.trim();
+    if (!etapaId || !etapa || !label) return;
+    const campo: CustomFieldEtapa = {
+      id: 'campo-' + Date.now(),
+      label,
+      required: state.orchestratorNewFieldRequired,
+      tipo: state.orchestratorNewFieldType,
+    };
+    void atualizarEtapaOrquestradorReal(etapaId, { camposUsuario: [...etapa.camposUsuario, campo] });
+    update({ orchestratorNewFieldLabel: '', orchestratorNewFieldType: 'text', orchestratorNewFieldRequired: false });
+  };
+  const removerCampoUsuarioSelecionado = (campoId: string) => {
+    const etapaId = state.orchestratorSelectedEtapaId;
+    const etapa = state.moduloFluxo?.etapas.find((e) => e.id === etapaId);
+    if (!etapaId || !etapa) return;
+    void atualizarEtapaOrquestradorReal(etapaId, { camposUsuario: etapa.camposUsuario.filter((c) => c.id !== campoId) });
+  };
+  const toggleEntradaRefSelecionada = (refEtapaId: string) => {
+    const etapaId = state.orchestratorSelectedEtapaId;
+    const etapa = state.moduloFluxo?.etapas.find((e) => e.id === etapaId);
+    if (!etapaId || !etapa) return;
+    const refs = etapa.entradaRefs.includes(refEtapaId)
+      ? etapa.entradaRefs.filter((id) => id !== refEtapaId)
+      : [...etapa.entradaRefs, refEtapaId];
+    void atualizarEtapaOrquestradorReal(etapaId, { entradaRefs: refs });
+  };
+
+  const publicarFluxoReal = async () => {
+    const moduloId = state.currentModuloId;
+    if (!moduloId) return;
+    update({ wizardSaving: true, wizardError: null });
+    try {
+      await publicarFluxo(accessToken, moduloId);
+      await carregarFluxoDoModulo(moduloId);
+      update({ wizardSaving: false });
+      showToast('Fluxo publicado com sucesso.');
+    } catch (err) {
+      update({ wizardSaving: false, wizardError: err instanceof Error ? err.message : 'Erro ao publicar o fluxo' });
+    }
+  };
+
+  // --- Instâncias reais (Interação/Kanban) ---
+  const carregarInstanciasDoModulo = async (moduloId: string) => {
+    update({ instanciasLoading: true });
+    try {
+      const instancias = await listarInstancias(accessToken, moduloId);
+      update({ instanciasLoading: false, moduloInstancias: instancias });
+    } catch (err) {
+      update({ instanciasLoading: false, wizardError: err instanceof Error ? err.message : 'Erro ao carregar instâncias' });
+    }
+  };
+
+  const carregarDetalheInstancia = async (instanciaId: string) => {
+    update({ instanciaDetalheLoading: true });
+    try {
+      const detalhe = await detalharInstancia(accessToken, instanciaId);
+      update({ instanciaDetalheLoading: false, instanciaDetalhe: detalhe });
+    } catch (err) {
+      update({ instanciaDetalheLoading: false, wizardError: err instanceof Error ? err.message : 'Erro ao carregar instância' });
+    }
+  };
+
+  const abrirCardInstancia = (instanciaId: string) => {
+    update({ comprasCard: instanciaId });
+    void carregarDetalheInstancia(instanciaId);
+  };
+  const fecharCardInstancia = () => update({ comprasCard: null, instanciaDetalhe: null, cardActionPrompt: null });
+
+  const iniciarAcaoInstancia = (acao: AcaoEtapa) => {
+    if (acao.exigeCampo) {
+      update({ cardActionPrompt: { acao, valor: '' } });
+      return;
+    }
+    void confirmarAcaoInstancia(acao, {});
+  };
+  const updateCardActionPromptValor = (e: ChangeEvent<HTMLTextAreaElement>) =>
+    update((s) => (s.cardActionPrompt ? { cardActionPrompt: { ...s.cardActionPrompt, valor: e.target.value } } : null));
+  const cancelarAcaoInstancia = () => update({ cardActionPrompt: null });
+  const confirmarAcaoInstancia = async (acao: AcaoEtapa, dados: Record<string, unknown>) => {
+    const instanciaId = state.comprasCard;
+    if (!instanciaId) return;
+    try {
+      await executarAcaoApi(accessToken, instanciaId, acao.id, dados);
+      update({ cardActionPrompt: null });
+      await carregarDetalheInstancia(instanciaId);
+      if (state.currentModuloId) await carregarInstanciasDoModulo(state.currentModuloId);
+      showToast(`Ação "${acao.label}" executada.`);
+    } catch (err) {
+      update({ wizardError: err instanceof Error ? err.message : 'Erro ao executar ação' });
+    }
+  };
+  const confirmarCardActionPrompt = () => {
+    const prompt = state.cardActionPrompt;
+    if (!prompt) return;
+    if (prompt.acao.exigeCampo?.obrigatorio && !prompt.valor.trim()) return;
+    void confirmarAcaoInstancia(prompt.acao, prompt.acao.exigeCampo ? { [prompt.acao.exigeCampo.key]: prompt.valor } : {});
+  };
+
+  // --- Integração WhatsApp real ---
+  const carregarIntegracaoWhatsApp = async () => {
+    try {
+      const integracao = await obterIntegracaoWhatsApp(accessToken);
+      update({ integracaoWhatsApp: integracao });
+    } catch (err) {
+      update({ wizardError: err instanceof Error ? err.message : 'Erro ao carregar integração de WhatsApp' });
+    }
+  };
+  const salvarIntegracaoWhatsAppReal = async () => {
+    const f = state.waForm;
+    if (!f.apiUrl.trim() || !f.instanceName.trim()) return;
+    try {
+      const integracao = await salvarIntegracaoWhatsAppApi(accessToken, {
+        apiUrl: f.apiUrl,
+        instanceName: f.instanceName,
+        phone: f.phone,
+        ...(state.waNewKey.trim() ? { apiKey: state.waNewKey } : {}),
+      });
+      update({ integracaoWhatsApp: integracao, waChangingKey: false, waNewKey: '' });
+      showToast('Integração de WhatsApp salva.');
+    } catch (err) {
+      update({ wizardError: err instanceof Error ? err.message : 'Erro ao salvar integração de WhatsApp' });
+    }
+  };
+  const testarIntegracaoWhatsAppReal = async () => {
+    update({ waConnectionState: 'testing' });
+    try {
+      const integracao = await testarIntegracaoWhatsAppApi(accessToken);
+      update({
+        integracaoWhatsApp: integracao,
+        waConnectionState: integracao.ultimoTesteSucesso ? 'connected' : 'disconnected',
+        waLastTestMsg: integracao.ultimoTesteSucesso ? 'Conectado com sucesso.' : (integracao.ultimaMensagemErro ?? 'Falha ao conectar.'),
+      });
+    } catch (err) {
+      update({ waConnectionState: 'disconnected', waLastTestMsg: err instanceof Error ? err.message : 'Erro ao testar conexão' });
+    }
+  };
+
   // --- Testar skill real ---
   const selecionarSkillParaTeste = (skillId: string) => update({ skillTestSelecionadaId: skillId, skillTestResultado: null, skillTestErro: null });
   const updateSkillTestEntrada = (e: ChangeEvent<HTMLTextAreaElement>) => update({ skillTestEntrada: e.target.value });
@@ -1350,6 +1616,16 @@ export function useCorePilotState(accessToken: string) {
     carregarConsultasDoModulo, toggleNovaConsultaForm, updateNovaConsultaField, adicionarParametroConsulta, atualizarParametroConsulta,
     adicionarCampoFiltroConsulta, atualizarCampoFiltroConsulta, salvarNovaConsultaReal, testarConsultaReal, toggleSincronizacaoConsultaReal,
     atualizarIntervaloConsultaReal,
+    carregarFluxoDoModulo, selecionarEtapaOrquestrador, fecharPainelOrquestrador,
+    toggleNovaMacroetapaForm, updateNovaMacroetapaNome, criarMacroetapaReal,
+    criarEtapaOrquestradorReal, atualizarEtapaOrquestradorReal, excluirEtapaOrquestradorSelecionada,
+    updateOrchestratorNewApprover, adicionarAprovadorSelecionado, removerAprovadorSelecionado,
+    updateOrchestratorNewFieldLabel, updateOrchestratorNewFieldType, toggleOrchestratorNewFieldRequired,
+    adicionarCampoUsuarioSelecionado, removerCampoUsuarioSelecionado, toggleEntradaRefSelecionada,
+    publicarFluxoReal,
+    carregarInstanciasDoModulo, carregarDetalheInstancia, abrirCardInstancia, fecharCardInstancia,
+    iniciarAcaoInstancia, updateCardActionPromptValor, cancelarAcaoInstancia, confirmarCardActionPrompt,
+    carregarIntegracaoWhatsApp, salvarIntegracaoWhatsAppReal, testarIntegracaoWhatsAppReal,
     selecionarSkillParaTeste, updateSkillTestEntrada, executarTesteSkillReal,
     carregarConversaDoModulo, updateModuloChatDraft, enviarMensagemModuloReal,
     criarConversaModulo, selecionarConversaModulo, arquivarConversaModulo, desarquivarConversaModulo,
