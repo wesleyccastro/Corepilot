@@ -82,8 +82,16 @@ export class OrquestradorFilaWorker {
       this.logger.error(
         `Execução ${execucao.id} está travada em "processing" há mais de ${this.LIMITE_PROCESSING_MS}ms — marcando como falha para revisão manual`,
       );
-      await this.prisma.execucaoDeEtapa.update({
-        where: { id: execucao.id },
+      // Mesma guarda condicional de reivindicarExecucao: só marcamos "failed"
+      // se a linha ainda estiver "processing" no momento desta escrita. Sem
+      // isso, uma tentativa em andamento (de um tick anterior, ainda
+      // executando) poderia terminar e gravar "done" entre o findMany acima e
+      // este update — e sobrescreveríamos um envio que na verdade teve
+      // sucesso de volta para "failed", levando a um reenvio manual
+      // desnecessário. Se count === 0, a linha já saiu de "processing" nesse
+      // meio-tempo — pulamos ela inteiramente, sem tocar na instância também.
+      const resultado = await this.prisma.execucaoDeEtapa.updateMany({
+        where: { id: execucao.id, status: 'processing' },
         data: {
           status: 'failed',
           mensagemErro:
@@ -91,6 +99,9 @@ export class OrquestradorFilaWorker {
           concluidoEm: new Date(),
         },
       });
+      if (resultado.count === 0) {
+        continue;
+      }
       await this.prisma.instanciaDeProcesso.update({
         where: { id: execucao.instanciaId },
         data: { status: 'erro' },

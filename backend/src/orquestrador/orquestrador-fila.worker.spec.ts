@@ -440,8 +440,8 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
 
     await worker.processarFilaIntegracoes();
 
-    expect(prisma.execucaoDeEtapa.update).toHaveBeenCalledWith({
-      where: { id: 'exec-travada' },
+    expect(prisma.execucaoDeEtapa.updateMany).toHaveBeenCalledWith({
+      where: { id: 'exec-travada', status: 'processing' },
       data: expect.objectContaining({
         status: 'failed',
         mensagemErro: expect.stringContaining('travada em processing'),
@@ -451,6 +451,39 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
       where: { id: 'inst-2' },
       data: { status: 'erro' },
     });
+    expect(evolutionApi.enviarMensagem).not.toHaveBeenCalled();
+    expect(engine.avancar).not.toHaveBeenCalled();
+  });
+
+  it('não sobrescreve nem toca a instância quando a execução travada termina entre ser encontrada e a recuperação', async () => {
+    const { prisma, anthropicService, engine, evolutionApi, config } =
+      buildDeps();
+    const execucaoTravada = { id: 'exec-travada', instanciaId: 'inst-2' };
+    (prisma.execucaoDeEtapa.findMany as jest.Mock)
+      .mockResolvedValueOnce([execucaoTravada]) // recuperarExecucoesTravadas encontra a linha travada
+      .mockResolvedValueOnce([]); // nada pending pra processar depois
+    // A linha, na verdade, terminou "done" entre o findMany acima e esta
+    // escrita (ex.: um tick anterior, ainda em andamento, concluiu o envio
+    // nesse meio-tempo) — o updateMany condicional não encontra mais a linha
+    // em "processing" e retorna count: 0.
+    (prisma.execucaoDeEtapa.updateMany as jest.Mock).mockResolvedValueOnce({
+      count: 0,
+    });
+    const worker = new OrquestradorFilaWorker(
+      prisma,
+      anthropicService,
+      engine,
+      evolutionApi,
+      config,
+    );
+
+    await worker.processarFilaIntegracoes();
+
+    expect(prisma.execucaoDeEtapa.updateMany).toHaveBeenCalledWith({
+      where: { id: 'exec-travada', status: 'processing' },
+      data: expect.objectContaining({ status: 'failed' }),
+    });
+    expect(prisma.instanciaDeProcesso.update).not.toHaveBeenCalled();
     expect(evolutionApi.enviarMensagem).not.toHaveBeenCalled();
     expect(engine.avancar).not.toHaveBeenCalled();
   });
