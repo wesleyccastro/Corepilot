@@ -11,6 +11,7 @@ import type {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ModuloService } from '../modulo/modulo.service';
 import { calcularAcoes } from './acoes';
 import { chaveIdempotencia } from './idempotencia';
 
@@ -22,13 +23,21 @@ function atorParaExecutor(executor: string): AtorExecucao {
 
 @Injectable()
 export class OrquestradorEngineService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly moduloService: ModuloService,
+  ) {}
 
   async criarInstancia(
     moduloId: string,
     empresaId: string,
     dadosIniciais: Record<string, unknown>,
   ): Promise<InstanciaDeProcesso> {
+    // Sem isto, um moduloId de outra empresa passaria direto: o findFirst do
+    // fluxo abaixo não filtra por empresa, e a instância criada rodaria o
+    // fluxo/agente/skill de uma empresa estranha em nome desta.
+    await this.moduloService.findByIdInEmpresa(moduloId, empresaId);
+
     const fluxo = await this.prisma.fluxo.findFirst({
       where: { moduloId, publicado: true },
       orderBy: { versao: 'desc' },

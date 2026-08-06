@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { OrquestradorEngineService } from './orquestrador-engine.service';
 import type { PrismaService } from '../prisma/prisma.service';
+import type { ModuloService } from '../modulo/modulo.service';
 
 describe('OrquestradorEngineService', () => {
   function buildPrisma() {
@@ -30,6 +31,12 @@ describe('OrquestradorEngineService', () => {
     } as unknown as PrismaService;
   }
 
+  function buildModuloService() {
+    return {
+      findByIdInEmpresa: jest.fn().mockResolvedValue({ id: 'modulo-1' }),
+    } as unknown as ModuloService;
+  }
+
   const etapaAutomatica = {
     id: 'e-1',
     fluxoId: 'fluxo-1',
@@ -55,10 +62,32 @@ describe('OrquestradorEngineService', () => {
   };
 
   describe('criarInstancia', () => {
+    it('lança NotFoundException se o módulo não pertence à empresa do chamador, sem sequer consultar o fluxo', async () => {
+      const prisma = buildPrisma();
+      const moduloService = buildModuloService();
+      (moduloService.findByIdInEmpresa as jest.Mock).mockRejectedValue(
+        new NotFoundException('Módulo não encontrado'),
+      );
+      const service = new OrquestradorEngineService(prisma, moduloService);
+
+      await expect(
+        service.criarInstancia('modulo-de-outra-empresa', 'empresa-1', {}),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(moduloService.findByIdInEmpresa).toHaveBeenCalledWith(
+        'modulo-de-outra-empresa',
+        'empresa-1',
+      );
+      expect(prisma.fluxo.findFirst).not.toHaveBeenCalled();
+    });
+
     it('lança NotFoundException se o módulo não tem fluxo publicado', async () => {
       const prisma = buildPrisma();
       (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue(null);
-      const service = new OrquestradorEngineService(prisma);
+      const service = new OrquestradorEngineService(
+        prisma,
+        buildModuloService(),
+      );
 
       await expect(
         service.criarInstancia('modulo-1', 'empresa-1', {}),
@@ -67,6 +96,7 @@ describe('OrquestradorEngineService', () => {
 
     it('cria a instância na primeira etapa e, sendo automática, avança sozinha até a próxima etapa parada', async () => {
       const prisma = buildPrisma();
+      const moduloService = buildModuloService();
       (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue({
         id: 'fluxo-1',
         etapas: [etapaAutomatica, etapaAgente],
@@ -83,12 +113,16 @@ describe('OrquestradorEngineService', () => {
       (
         prisma.instanciaDeProcesso.findUniqueOrThrow as jest.Mock
       ).mockResolvedValue({ id: 'inst-1', etapaAtualId: 'e-2' });
-      const service = new OrquestradorEngineService(prisma);
+      const service = new OrquestradorEngineService(prisma, moduloService);
 
       await service.criarInstancia('modulo-1', 'empresa-1', {
         origem: 'teste',
       });
 
+      expect(moduloService.findByIdInEmpresa).toHaveBeenCalledWith(
+        'modulo-1',
+        'empresa-1',
+      );
       expect(prisma.execucaoDeEtapa.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ etapaId: 'e-1', status: 'done' }),
@@ -135,7 +169,10 @@ describe('OrquestradorEngineService', () => {
         etapaAprovacao,
       ]);
       (prisma.execucaoDeEtapa.findMany as jest.Mock).mockResolvedValue([]);
-      const service = new OrquestradorEngineService(prisma);
+      const service = new OrquestradorEngineService(
+        prisma,
+        buildModuloService(),
+      );
 
       const detalhe = await service.detalhar('inst-1', 'empresa-1');
 
@@ -158,7 +195,10 @@ describe('OrquestradorEngineService', () => {
         etapaAprovacao,
       );
       (prisma.etapa.findFirst as jest.Mock).mockResolvedValue(null);
-      const service = new OrquestradorEngineService(prisma);
+      const service = new OrquestradorEngineService(
+        prisma,
+        buildModuloService(),
+      );
 
       await service.avancar('inst-1', 'e-3');
 
@@ -182,7 +222,10 @@ describe('OrquestradorEngineService', () => {
         etapaAprovacao,
       );
       (prisma.etapa.findFirst as jest.Mock).mockResolvedValue(null);
-      const service = new OrquestradorEngineService(prisma);
+      const service = new OrquestradorEngineService(
+        prisma,
+        buildModuloService(),
+      );
 
       await expect(
         service.executarAcao(
@@ -207,7 +250,10 @@ describe('OrquestradorEngineService', () => {
         etapaAprovacao,
       );
       (prisma.etapa.findFirst as jest.Mock).mockResolvedValue(null);
-      const service = new OrquestradorEngineService(prisma);
+      const service = new OrquestradorEngineService(
+        prisma,
+        buildModuloService(),
+      );
 
       await expect(
         service.executarAcao(
@@ -238,7 +284,10 @@ describe('OrquestradorEngineService', () => {
       (
         prisma.instanciaDeProcesso.findUniqueOrThrow as jest.Mock
       ).mockResolvedValue({ id: 'inst-1', etapaAtualId: 'e-2' });
-      const service = new OrquestradorEngineService(prisma);
+      const service = new OrquestradorEngineService(
+        prisma,
+        buildModuloService(),
+      );
 
       await service.executarAcao(
         'inst-1',
@@ -279,7 +328,10 @@ describe('OrquestradorEngineService', () => {
           macroetapa: { id: 'me-1', nome: 'Triagem' },
         },
       ]);
-      const service = new OrquestradorEngineService(prisma);
+      const service = new OrquestradorEngineService(
+        prisma,
+        buildModuloService(),
+      );
 
       const resultado = await service.listar('modulo-1', 'empresa-1');
 
@@ -295,7 +347,10 @@ describe('OrquestradorEngineService', () => {
     it('devolve lista vazia sem consultar etapas quando não há instâncias', async () => {
       const prisma = buildPrisma();
       (prisma.instanciaDeProcesso.findMany as jest.Mock).mockResolvedValue([]);
-      const service = new OrquestradorEngineService(prisma);
+      const service = new OrquestradorEngineService(
+        prisma,
+        buildModuloService(),
+      );
 
       const resultado = await service.listar('modulo-1', 'empresa-1');
 

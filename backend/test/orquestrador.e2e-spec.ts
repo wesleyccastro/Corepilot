@@ -215,6 +215,12 @@ describe('Orquestrador BPM (motor de ponta a ponta + isolamento entre tenants)',
     const outra = await criarEmpresaComUsuarioLogado('E2E Orquestrador Outra Empresa', `e2e-orq-outra-${sufixo}@corepilot.dev`);
     await request(app.getHttpServer())
       .get(`/instancias/${instanciaId}`).set('Authorization', `Bearer ${outra.accessToken}`).expect(404);
+
+    // Isolamento (C1): outra empresa não consegue criar uma instância rodando
+    // o fluxo publicado de um módulo que não é dela, mesmo sabendo o moduloId.
+    await request(app.getHttpServer())
+      .post(`/modulos/${moduloId}/fluxo/instancias`).set('Authorization', `Bearer ${outra.accessToken}`)
+      .send({ dadosIniciais: {} }).expect(404);
   });
 
   (TEM_CREDENCIAIS_EVOLUTION_DE_TESTE ? it : it.skip)(
