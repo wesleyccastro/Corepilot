@@ -526,6 +526,70 @@ describe('FluxoService — Etapa', () => {
     expect(prisma.etapa.update).not.toHaveBeenCalled();
   });
 
+  it('aceita um agenteId e skillId válidos, pertencentes à mesma empresa e ao mesmo agente', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue({
+      id: 'fluxo-1',
+      macroetapas: [],
+      etapas: [],
+    });
+    (prisma.etapa.findFirst as jest.Mock).mockResolvedValue(etapaBase); // agenteId atual: 'agente-1', irrelevante aqui pois dto.agenteId é informado
+    (prisma.agente.findFirst as jest.Mock).mockResolvedValue({
+      id: 'agente-1',
+    });
+    (prisma.skill.findFirst as jest.Mock).mockResolvedValue({
+      id: 'skill-1',
+      agenteId: 'agente-1',
+    });
+    (prisma.etapa.update as jest.Mock).mockResolvedValue({ id: 'e-1' });
+    const service = new FluxoService(prisma, moduloService);
+
+    await service.atualizarEtapa('modulo-1', 'empresa-1', 'e-1', {
+      agenteId: 'agente-1',
+      skillId: 'skill-1',
+    });
+
+    // Guarda contra uma futura inversão de lógica (ex.: `!==` virar `===`
+    // por engano): os testes de rejeição acima não pegariam isso, já que
+    // continuariam rejeitando (só que pelo motivo errado). Este é o único
+    // teste que garante que um par válido efetivamente passa e chega no
+    // write.
+    expect(prisma.etapa.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          agenteId: 'agente-1',
+          skillId: 'skill-1',
+        }),
+      }),
+    );
+  });
+
+  it('aceita desassociar o agente da etapa explicitamente (agenteId: null)', async () => {
+    const { prisma, moduloService } = buildDeps();
+    (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue({
+      id: 'fluxo-1',
+      macroetapas: [],
+      etapas: [],
+    });
+    (prisma.etapa.findFirst as jest.Mock).mockResolvedValue(etapaBase); // agenteId atual: 'agente-1'
+    (prisma.etapa.update as jest.Mock).mockResolvedValue({ id: 'e-1' });
+    const service = new FluxoService(prisma, moduloService);
+
+    await service.atualizarEtapa('modulo-1', 'empresa-1', 'e-1', {
+      agenteId: null,
+    });
+
+    // null é falsy: a checagem de ownership de agenteId não roda (nada pra
+    // validar — não é um id de outra empresa, é a ausência de agente), e o
+    // write grava null como veio.
+    expect(prisma.agente.findFirst).not.toHaveBeenCalled();
+    expect(prisma.etapa.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ agenteId: null }),
+      }),
+    );
+  });
+
   it('excluir uma etapa limpa o loopParaEtapaId de quem apontava pra ela', async () => {
     const { prisma, moduloService } = buildDeps();
     (prisma.fluxo.findFirst as jest.Mock).mockResolvedValue({

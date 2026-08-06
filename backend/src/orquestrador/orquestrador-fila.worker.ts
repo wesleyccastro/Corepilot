@@ -81,9 +81,25 @@ export class OrquestradorFilaWorker implements OnApplicationBootstrap {
   // sido o autor dela. Reaproveita a mesma recuperarExecucoesTravadas usada
   // pelo sweep periódico: sem limiar de tempo, o comportamento já é
   // "recupera tudo que não está no Set", que é exatamente o que se quer aqui.
+  //
+  // Cada chamada tem seu próprio try/catch: uma falha aqui (ex.: blip
+  // transitório do Supabase) não pode virar uma unhandled rejection.
+  // main.ts's bootstrap() não tem .catch(), então deixar isso escapar
+  // derrubaria o processo inteiro — toda a API, não só o worker — por causa
+  // de uma varredura de recuperação que o @Interval periódico já refaz
+  // sozinho 5 segundos depois. Um sweep de partida que falha e é ignorado é
+  // estritamente melhor do que a API inteira não subir.
   async onApplicationBootstrap(): Promise<void> {
-    await this.recuperarExecucoesTravadas('agente');
-    await this.recuperarExecucoesTravadas('integracao');
+    try {
+      await this.recuperarExecucoesTravadas('agente');
+    } catch (erro) {
+      this.logger.error('Falha no sweep de partida (agente)', erro);
+    }
+    try {
+      await this.recuperarExecucoesTravadas('integracao');
+    } catch (erro) {
+      this.logger.error('Falha no sweep de partida (integração)', erro);
+    }
   }
 
   // Recuperação de execuções travadas: se o processo cair depois de reivindicar
@@ -145,15 +161,33 @@ export class OrquestradorFilaWorker implements OnApplicationBootstrap {
   // concorrentes do @Interval (ex.: um lote anterior que ainda não terminou
   // quando o próximo tick dispara) poderiam ambas pegar a mesma linha
   // "pending" do findMany e enviar a mensagem duas vezes.
+  //
+  // O id entra no Set ANTES do updateMany confirmar a reivindicação, não
+  // depois: o `.add()` só rodaria depois que a Promise do updateMany já
+  // tivesse resolvido, deixando uma janela entre o COMMIT no banco (linha já
+  // "processing") e o Set ainda não refletir isso. Um sweep concorrente
+  // (recuperarExecucoesTravadas de outro tick) que caia exatamente nessa
+  // janela veria a linha como "processing" e não reivindicada — e a varreria
+  // por engano. Adicionar antes fecha essa janela; se a reivindicação não se
+  // confirmar (count === 0, outro tick já pegou primeiro) ou o próprio
+  // updateMany lançar, removemos de novo — o Set nunca fica com um id que
+  // nunca foi de fato nosso.
   private async reivindicarExecucao(execucaoId: string): Promise<boolean> {
-    const resultado = await this.prisma.execucaoDeEtapa.updateMany({
-      where: { id: execucaoId, status: 'pending' },
-      data: { status: 'processing' },
-    });
+    this.execucoesReivindicadas.add(execucaoId);
+    let resultado: { count: number };
+    try {
+      resultado = await this.prisma.execucaoDeEtapa.updateMany({
+        where: { id: execucaoId, status: 'pending' },
+        data: { status: 'processing' },
+      });
+    } catch (erro) {
+      this.execucoesReivindicadas.delete(execucaoId);
+      throw erro;
+    }
     if (resultado.count > 0) {
-      this.execucoesReivindicadas.add(execucaoId);
       return true;
     }
+    this.execucoesReivindicadas.delete(execucaoId);
     return false;
   }
 
@@ -274,6 +308,11 @@ export class OrquestradorFilaWorker implements OnApplicationBootstrap {
           tokensEntrada: response.usage.input_tokens,
           tokensSaida: response.usage.output_tokens,
           concluidoEm: new Date(),
+          // Limpa uma mensagemErro deixada por um sweep de travadas anterior
+          // (falso positivo) — senão uma execução saudável e concluída fica
+          // exibindo pra sempre um aviso de "travada em processing" no
+          // histórico.
+          mensagemErro: null,
         },
       });
 
@@ -430,6 +469,9 @@ export class OrquestradorFilaWorker implements OnApplicationBootstrap {
             messageId: resultado.messageId,
           },
           concluidoEm: new Date(),
+          // Mesmo motivo do agente: limpa um aviso de sweep falso-positivo
+          // que não faz mais sentido numa execução que terminou com sucesso.
+          mensagemErro: null,
         },
       });
       await tx.instanciaDeProcesso.update({

@@ -259,7 +259,13 @@ export class FluxoService {
       if (!skill) {
         throw new NotFoundException('Skill não encontrada nesta empresa');
       }
-      const agenteDaEtapa = dto.agenteId ?? etapaAtual.agenteId;
+      // Mesma forma usada no write mais abaixo (`dto.agenteId === undefined
+      // ? etapaAtual.agenteId : dto.agenteId`), de propósito: com `??`, um
+      // payload `{ agenteId: null, skillId: '<skill do agente ANTIGO>' }`
+      // validaria contra o agente antigo (ainda não trocado) mas o write
+      // gravaria agenteId null — deixando a etapa com skill mas sem agente.
+      const agenteDaEtapa =
+        dto.agenteId === undefined ? etapaAtual.agenteId : dto.agenteId;
       if (skill.agenteId !== agenteDaEtapa) {
         throw new BadRequestException(
           'A skill selecionada não pertence ao agente desta etapa',

@@ -124,6 +124,34 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
     );
   });
 
+  it('limpa uma mensagemErro deixada por um sweep de travadas anterior ao concluir com sucesso', async () => {
+    const { prisma, anthropicService, engine, evolutionApi, config } =
+      buildDeps();
+    (prisma.execucaoDeEtapa.findMany as jest.Mock)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([execucaoPendente]);
+    (anthropicService.parseStructured as jest.Mock).mockResolvedValue({
+      parsed_output: { grupos: ['parafusos'] },
+      usage: { input_tokens: 100, output_tokens: 20 },
+    });
+    const worker = new OrquestradorFilaWorker(
+      prisma,
+      anthropicService,
+      engine,
+      evolutionApi,
+      config,
+    );
+
+    await worker.processarFilaAgentes();
+
+    expect(prisma.execucaoDeEtapa.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { id: 'exec-1' },
+        data: expect.objectContaining({ status: 'done', mensagemErro: null }),
+      }),
+    );
+  });
+
   it('filtra a entrada da Skill pelas entradaRefs da etapa', async () => {
     const { prisma, anthropicService, engine, evolutionApi, config } =
       buildDeps();
@@ -374,6 +402,36 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
     });
   });
 
+  it('limpa uma mensagemErro deixada por um sweep de travadas anterior ao concluir o envio com sucesso', async () => {
+    const { prisma, anthropicService, engine, evolutionApi, config } =
+      buildDeps();
+    (prisma.execucaoDeEtapa.findMany as jest.Mock)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([execucaoIntegracaoPura]);
+    (prisma.integracaoWhatsApp.findUnique as jest.Mock).mockResolvedValue(
+      integracaoSalva,
+    );
+    (evolutionApi.enviarMensagem as jest.Mock).mockResolvedValue({
+      messageId: 'msg-1',
+    });
+    const worker = new OrquestradorFilaWorker(
+      prisma,
+      anthropicService,
+      engine,
+      evolutionApi,
+      config,
+    );
+
+    await worker.processarFilaIntegracoes();
+
+    expect(prisma.execucaoDeEtapa.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'exec-3' },
+        data: expect.objectContaining({ status: 'done', mensagemErro: null }),
+      }),
+    );
+  });
+
   it('numa etapa agente_mais_integracao, redige a mensagem com a Anthropic antes de enviar', async () => {
     const { prisma, anthropicService, engine, evolutionApi, config } =
       buildDeps();
@@ -558,6 +616,58 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
     );
   });
 
+  it('remove do Set uma reivindicação que não se confirmou (updateMany count: 0)', async () => {
+    const { prisma, anthropicService, engine, evolutionApi, config } =
+      buildDeps();
+    (prisma.execucaoDeEtapa.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.execucaoDeEtapa.updateMany as jest.Mock).mockResolvedValueOnce({
+      count: 0, // outro tick já reivindicou a linha primeiro
+    });
+    const worker = new OrquestradorFilaWorker(
+      prisma,
+      anthropicService,
+      engine,
+      evolutionApi,
+      config,
+    );
+
+    const reivindicou = await worker['reivindicarExecucao']('exec-perdeu');
+    expect(reivindicou).toBe(false);
+
+    // O id não pode ter ficado "preso" no Set: se tivesse, o filtro de
+    // travadas excluiria pra sempre uma linha que este processo nunca
+    // chegou a reivindicar de verdade.
+    await worker['recuperarExecucoesTravadas']('integracao');
+    expect(prisma.execucaoDeEtapa.findMany).toHaveBeenCalledWith({
+      where: { status: 'processing', ator: 'integracao', id: { notIn: [] } },
+    });
+  });
+
+  it('remove do Set e propaga o erro se o updateMany da reivindicação lançar', async () => {
+    const { prisma, anthropicService, engine, evolutionApi, config } =
+      buildDeps();
+    (prisma.execucaoDeEtapa.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.execucaoDeEtapa.updateMany as jest.Mock).mockRejectedValueOnce(
+      new Error('conexão perdida'),
+    );
+    const worker = new OrquestradorFilaWorker(
+      prisma,
+      anthropicService,
+      engine,
+      evolutionApi,
+      config,
+    );
+
+    await expect(worker['reivindicarExecucao']('exec-falhou')).rejects.toThrow(
+      'conexão perdida',
+    );
+
+    await worker['recuperarExecucoesTravadas']('integracao');
+    expect(prisma.execucaoDeEtapa.findMany).toHaveBeenCalledWith({
+      where: { status: 'processing', ator: 'integracao', id: { notIn: [] } },
+    });
+  });
+
   it('remove a execução do Set de reivindicadas ao terminar de processar (sucesso ou falha), voltando a ficar sujeita ao sweep', async () => {
     const { prisma, anthropicService, engine, evolutionApi, config } =
       buildDeps();
@@ -702,5 +812,36 @@ describe('OrquestradorFilaWorker — onApplicationBootstrap (sweep de partida)',
       where: { id: 'inst-2' },
       data: { status: 'erro' },
     });
+  });
+
+  it('não propaga uma falha do sweep de partida (ex.: blip transitório do banco) — a API não pode cair por causa disso', async () => {
+    const { prisma, anthropicService, engine, evolutionApi, config } =
+      buildDeps();
+    // main.ts's bootstrap() não tem .catch(): se isso escapasse como uma
+    // rejeição não tratada, derrubaria o processo inteiro (todos os
+    // endpoints HTTP), não só o worker — bem pior do que a recuperação de
+    // travadas simplesmente não rodar nesta subida (o @Interval periódico
+    // tenta de novo em 5s).
+    (prisma.execucaoDeEtapa.findMany as jest.Mock)
+      .mockRejectedValueOnce(new Error('Supabase indisponível'))
+      .mockResolvedValueOnce([]);
+    const worker = new OrquestradorFilaWorker(
+      prisma,
+      anthropicService,
+      engine,
+      evolutionApi,
+      config,
+    );
+    const erroSpy = jest.spyOn(worker['logger'], 'error');
+
+    await expect(worker.onApplicationBootstrap()).resolves.toBeUndefined();
+
+    expect(erroSpy).toHaveBeenCalledWith(
+      expect.stringContaining('sweep de partida'),
+      expect.any(Error),
+    );
+    // O sweep de 'integracao' ainda roda mesmo com o de 'agente' tendo
+    // falhado — cada chamada tem seu próprio try/catch independente.
+    expect(prisma.execucaoDeEtapa.findMany).toHaveBeenCalledTimes(2);
   });
 });
