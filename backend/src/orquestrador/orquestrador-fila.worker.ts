@@ -56,8 +56,10 @@ export class OrquestradorFilaWorker {
     })) as ExecucaoDeAgente[];
 
     for (const execucao of pendentes) {
+      let processouComSucesso = false;
       try {
         await this.processarExecucaoDeAgente(execucao);
+        processouComSucesso = true;
       } catch (erro) {
         this.logger.error(
           `Falha ao processar execução de agente ${execucao.id}`,
@@ -75,6 +77,26 @@ export class OrquestradorFilaWorker {
           where: { id: execucao.instanciaId },
           data: { status: 'erro' },
         });
+      }
+
+      // engine.avancar roda fora do try/catch acima de propósito: nesse ponto
+      // a execução já foi commitada como "done" com sua saída (agente
+      // concluiu com sucesso). Se avancar falhar, a execução em si continua
+      // "done" — só a instância fica travada — nunca sobrescrevemos um
+      // registro de auditoria bem-sucedido com "failed".
+      if (processouComSucesso) {
+        try {
+          await this.engine.avancar(execucao.instanciaId, execucao.etapaId);
+        } catch (erro) {
+          this.logger.error(
+            `Execução de agente ${execucao.id} concluiu com sucesso, mas falhou ao avançar a instância`,
+            erro,
+          );
+          await this.prisma.instanciaDeProcesso.update({
+            where: { id: execucao.instanciaId },
+            data: { status: 'erro' },
+          });
+        }
       }
     }
   }
@@ -137,8 +159,6 @@ export class OrquestradorFilaWorker {
         data: { dadosAcumulados: dadosAcumulados as Prisma.InputJsonValue },
       });
     });
-
-    await this.engine.avancar(execucao.instanciaId, etapa.id);
   }
 
   private montarEntrada(

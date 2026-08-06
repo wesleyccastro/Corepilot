@@ -155,4 +155,40 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
 
     expect(engine.avancar).toHaveBeenCalledWith('inst-2', 'e-2');
   });
+
+  it('mantém a execução "done" quando avancar falha depois do commit', async () => {
+    const { prisma, anthropicService, engine } = buildDeps();
+    (prisma.execucaoDeEtapa.findMany as jest.Mock).mockResolvedValue([
+      execucaoPendente,
+    ]);
+    (anthropicService.parseStructured as jest.Mock).mockResolvedValue({
+      parsed_output: { grupos: ['parafusos'] },
+      usage: { input_tokens: 100, output_tokens: 20 },
+    });
+    (engine.avancar as jest.Mock).mockRejectedValue(
+      new Error('falha ao avançar'),
+    );
+    const worker = new OrquestradorFilaWorker(prisma, anthropicService, engine);
+
+    await worker.processarFilaAgentes();
+
+    const chamadasDeExecucao = (prisma.execucaoDeEtapa.update as jest.Mock).mock
+      .calls as { data?: { status?: string } }[][];
+    expect(
+      chamadasDeExecucao.some(([args]) => args.data?.status === 'failed'),
+    ).toBe(false);
+    expect(prisma.execucaoDeEtapa.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { id: 'exec-1' },
+        data: expect.objectContaining({
+          status: 'done',
+          output: { grupos: ['parafusos'] },
+        }),
+      }),
+    );
+    expect(prisma.instanciaDeProcesso.update).toHaveBeenCalledWith({
+      where: { id: 'inst-1' },
+      data: { status: 'erro' },
+    });
+  });
 });
