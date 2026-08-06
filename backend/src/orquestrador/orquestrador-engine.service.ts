@@ -77,6 +77,10 @@ export class OrquestradorEngineService {
     const proxima = await this.prisma.etapa.findFirst({
       where: { fluxoId: etapaAtual.fluxoId, ordem: etapaAtual.ordem + 1 },
     });
+    const etapas = await this.prisma.etapa.findMany({
+      where: { fluxoId: instancia.fluxoId },
+      orderBy: { ordem: 'asc' },
+    });
     const historico = await this.prisma.execucaoDeEtapa.findMany({
       where: { instanciaId },
       orderBy: { criadoEm: 'asc' },
@@ -85,6 +89,7 @@ export class OrquestradorEngineService {
     return {
       instancia,
       etapaAtual,
+      etapas,
       acoes: calcularAcoes(etapaAtual, proxima?.id ?? null),
       historico,
     };

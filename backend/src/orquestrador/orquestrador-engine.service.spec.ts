@@ -6,7 +6,11 @@ describe('OrquestradorEngineService', () => {
   function buildPrisma() {
     const prisma = {
       fluxo: { findFirst: jest.fn() },
-      etapa: { findUniqueOrThrow: jest.fn(), findFirst: jest.fn() },
+      etapa: {
+        findUniqueOrThrow: jest.fn(),
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+      },
       instanciaDeProcesso: {
         create: jest.fn(),
         update: jest.fn(),
@@ -105,6 +109,37 @@ describe('OrquestradorEngineService', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('detalhar', () => {
+    it('inclui as etapas do fluxo publicado, ordenadas, além da etapa atual/ações/histórico', async () => {
+      const prisma = buildPrisma();
+      (prisma.instanciaDeProcesso.findFirst as jest.Mock).mockResolvedValue({
+        id: 'inst-1',
+        empresaId: 'empresa-1',
+        etapaAtualId: 'e-2',
+        fluxoId: 'fluxo-1',
+      });
+      (prisma.etapa.findUniqueOrThrow as jest.Mock).mockResolvedValue(
+        etapaAgente,
+      );
+      (prisma.etapa.findFirst as jest.Mock).mockResolvedValue(etapaAprovacao);
+      (prisma.etapa.findMany as jest.Mock).mockResolvedValue([
+        etapaAutomatica,
+        etapaAgente,
+        etapaAprovacao,
+      ]);
+      (prisma.execucaoDeEtapa.findMany as jest.Mock).mockResolvedValue([]);
+      const service = new OrquestradorEngineService(prisma);
+
+      const detalhe = await service.detalhar('inst-1', 'empresa-1');
+
+      expect(detalhe.etapas).toEqual([
+        etapaAutomatica,
+        etapaAgente,
+        etapaAprovacao,
+      ]);
     });
   });
 
