@@ -3,6 +3,7 @@ import type { CorePilotActions } from '../useCorePilotState';
 import type { MeResponse } from '../useMe';
 import { BellIcon, BuildingIcon, ChevronDownIcon, GearIcon, LayersIcon, LogoutIcon, PlusIcon, SearchIcon, UsersIcon } from '../icons';
 import { colors, overlayFixed } from '../styles';
+import { supabase } from '../../lib/supabase/client';
 import logo from '../../assets/logo.png';
 
 interface HeaderProps {
@@ -81,7 +82,7 @@ export function Header({ state, actions, me }: HeaderProps) {
                     <LayersIcon size={15} color={colors.textMuted} />
                     <span style={{ fontSize: 13, fontWeight: 600 }}>Módulos</span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', cursor: 'pointer', color: colors.danger, borderTop: `1px solid ${colors.borderLight}` }}>
+                  <div onClick={() => void supabase.auth.signOut()} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', cursor: 'pointer', color: colors.danger, borderTop: `1px solid ${colors.borderLight}` }}>
                     <LogoutIcon />
                     <span style={{ fontSize: 13, fontWeight: 600 }}>Sair</span>
                   </div>
