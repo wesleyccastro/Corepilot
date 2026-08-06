@@ -5,16 +5,18 @@ import { Step1Identity } from './Step1Identity';
 import { Step2Knowledge } from './Step2Knowledge';
 import { Step3DataSources } from './Step3DataSources';
 import { Step4Agent } from './Step4Agent';
-import { Step5Permissions } from './Step5Permissions';
-import { Step6Review } from './Step6Review';
+import { Step5Orchestrator } from './Step5Orchestrator';
+import { Step6Permissions } from './Step6Permissions';
+import { Step7Review } from './Step7Review';
 
 const stepDefs = [
   { n: 1, label: 'Identidade' },
   { n: 2, label: 'Base de conhecimento' },
   { n: 3, label: 'Fontes de dados' },
   { n: 4, label: 'Agente e instruções' },
-  { n: 5, label: 'Permissões' },
-  { n: 6, label: 'Revisão e publicação' },
+  { n: 5, label: 'Orquestrador' },
+  { n: 6, label: 'Permissões' },
+  { n: 7, label: 'Revisão e publicação' },
 ];
 
 export function Wizard({ state, actions }: { state: CorePilotState; actions: CorePilotActions }) {
@@ -71,8 +73,9 @@ export function Wizard({ state, actions }: { state: CorePilotState; actions: Cor
         {state.wizardStep === 2 && <Step2Knowledge state={state} actions={actions} />}
         {state.wizardStep === 3 && <Step3DataSources state={state} actions={actions} />}
         {state.wizardStep === 4 && <Step4Agent state={state} actions={actions} />}
-        {state.wizardStep === 5 && <Step5Permissions state={state} actions={actions} />}
-        {state.wizardStep === 6 && <Step6Review state={state} actions={actions} />}
+        {state.wizardStep === 5 && <Step5Orchestrator state={state} actions={actions} />}
+        {state.wizardStep === 6 && <Step6Permissions state={state} actions={actions} />}
+        {state.wizardStep === 7 && <Step7Review state={state} actions={actions} />}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20 }}>
           {state.wizardStep > 1 ? (
@@ -91,7 +94,7 @@ export function Wizard({ state, actions }: { state: CorePilotState; actions: Cor
                 {state.wizardSaving ? 'Salvando…' : 'Salvar'}
               </button>
             )}
-            {state.wizardStep < 6 && (
+            {state.wizardStep < 7 && (
               <button onClick={actions.nextStep} disabled={state.wizardSaving} style={{ background: colors.navy, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>
                 {state.wizardSaving ? 'Salvando…' : 'Continuar'}
               </button>

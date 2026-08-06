@@ -2,7 +2,7 @@ import type { CorePilotState } from '../../initialState';
 import type { CorePilotActions } from '../../useCorePilotState';
 import { card, colors } from '../../styles';
 
-export function Step5Permissions({ state, actions }: { state: CorePilotState; actions: CorePilotActions }) {
+export function Step6Permissions({ state, actions }: { state: CorePilotState; actions: CorePilotActions }) {
   return (
     <div style={{ ...card, padding: 28 }}>
       <h2 style={{ fontSize: 19, fontWeight: 800, color: colors.navy, margin: '0 0 6px' }}>Permissões</h2>

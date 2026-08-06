@@ -289,7 +289,7 @@ export function useCorePilotState(accessToken: string) {
       const ok = await salvarModuloReal();
       if (!ok) return;
     }
-    update((s) => ({ wizardStep: Math.min(6, s.wizardStep + 1) }));
+    update((s) => ({ wizardStep: Math.min(7, s.wizardStep + 1) }));
   };
   const prevStep = () => update((s) => ({ wizardStep: Math.max(1, s.wizardStep - 1) }));
   const viewWizardNew = () => update({

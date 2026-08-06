@@ -2,7 +2,7 @@ import type { CorePilotState } from '../../initialState';
 import type { CorePilotActions } from '../../useCorePilotState';
 import { card, colors, panel } from '../../styles';
 
-export function Step6Review({ state, actions }: { state: CorePilotState; actions: CorePilotActions }) {
+export function Step7Review({ state, actions }: { state: CorePilotState; actions: CorePilotActions }) {
   const isEditing = !!state.editingModule;
   const agenteSelecionado = state.moduloAgentes.find((a) => a.id === state.selectedAgenteId);
 
