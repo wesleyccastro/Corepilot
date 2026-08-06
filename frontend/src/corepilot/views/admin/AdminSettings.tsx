@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import type { ChangeEvent } from 'react';
 import type { CorePilotState } from '../../initialState';
 import type { CorePilotActions } from '../../useCorePilotState';
 import { ChevronDownIcon, DatabaseIcon, MessageSquareIcon, SpinnerIcon, ToggleSwitch } from '../../icons';
@@ -7,8 +8,18 @@ import { colors, inputSm, label } from '../../styles';
 export function AdminSettings({ state, actions }: { state: CorePilotState; actions: CorePilotActions }) {
   useEffect(() => {
     actions.carregarFontesDeDados();
+    void actions.carregarIntegracaoWhatsApp();
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (state.integracaoWhatsApp) {
+      actions.updateWaField('apiUrl')({ target: { value: state.integracaoWhatsApp.apiUrl } } as ChangeEvent<HTMLInputElement>);
+      actions.updateWaField('instanceName')({ target: { value: state.integracaoWhatsApp.instanceName } } as ChangeEvent<HTMLInputElement>);
+      actions.updateWaField('phone')({ target: { value: state.integracaoWhatsApp.phone ?? '' } } as ChangeEvent<HTMLInputElement>);
+    }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.integracaoWhatsApp]);
 
   const isTesting = state.waConnectionState === 'testing';
   const badge = state.waConnectionState === 'connected'
@@ -159,7 +170,7 @@ export function AdminSettings({ state, actions }: { state: CorePilotState; actio
           </div>
           {isTesting && <SpinnerIcon />}
           <span style={{ background: badge.bg, color: badge.color, borderRadius: 20, padding: '4px 12px', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap' }}>{badge.label}</span>
-          <button onClick={actions.testWaConnection} disabled={isTesting} style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 7, padding: '7px 12px', fontSize: 12, fontWeight: 600, color: colors.navy, cursor: 'pointer' }}>Testar</button>
+          <button onClick={() => void actions.testWaConnection()} disabled={isTesting} style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 7, padding: '7px 12px', fontSize: 12, fontWeight: 600, color: colors.navy, cursor: 'pointer' }}>Testar</button>
           <span onClick={actions.toggleWaExpanded} style={{ cursor: 'pointer', padding: 4, color: colors.textFaint }}>
             <ChevronDownIcon color={colors.textFaint} style={{ transform: state.waExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .15s' }} />
           </span>
@@ -195,7 +206,7 @@ export function AdminSettings({ state, actions }: { state: CorePilotState; actio
                 <label style={label}>Número conectado</label>
                 <input type="text" value={state.waForm.phone} onChange={actions.updateWaField('phone')} placeholder="+55 11 90000-0000" style={{ ...inputSm, width: '100%' }} />
               </div>
-              <button onClick={actions.testWaConnection} style={{ alignSelf: 'flex-start', background: colors.navy, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Salvar e testar conexão</button>
+              <button onClick={() => void actions.testWaConnection()} style={{ alignSelf: 'flex-start', background: colors.navy, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Salvar e testar conexão</button>
             </div>
           </div>
         )}
