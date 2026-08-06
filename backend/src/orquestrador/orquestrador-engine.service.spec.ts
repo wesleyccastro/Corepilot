@@ -115,11 +115,15 @@ describe('OrquestradorEngineService', () => {
   describe('detalhar', () => {
     it('inclui as etapas do fluxo publicado, ordenadas, além da etapa atual/ações/histórico', async () => {
       const prisma = buildPrisma();
+      // fluxoId da instância propositalmente diferente do fluxoId de etapaAgente
+      // ('fluxo-1'): se a implementação buscasse as etapas por
+      // `etapaAtual.fluxoId` em vez de `instancia.fluxoId`, este teste pegaria
+      // a regressão através da asserção do `where` abaixo.
       (prisma.instanciaDeProcesso.findFirst as jest.Mock).mockResolvedValue({
         id: 'inst-1',
         empresaId: 'empresa-1',
         etapaAtualId: 'e-2',
-        fluxoId: 'fluxo-1',
+        fluxoId: 'fluxo-2',
       });
       (prisma.etapa.findUniqueOrThrow as jest.Mock).mockResolvedValue(
         etapaAgente,
@@ -135,6 +139,10 @@ describe('OrquestradorEngineService', () => {
 
       const detalhe = await service.detalhar('inst-1', 'empresa-1');
 
+      expect(prisma.etapa.findMany).toHaveBeenCalledWith({
+        where: { fluxoId: 'fluxo-2' },
+        orderBy: { ordem: 'asc' },
+      });
       expect(detalhe.etapas).toEqual([
         etapaAutomatica,
         etapaAgente,
