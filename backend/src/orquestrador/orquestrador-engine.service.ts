@@ -55,13 +55,32 @@ export class OrquestradorEngineService {
     return instancia;
   }
 
-  async listar(
-    moduloId: string,
-    empresaId: string,
-  ): Promise<InstanciaDeProcesso[]> {
-    return this.prisma.instanciaDeProcesso.findMany({
+  async listar(moduloId: string, empresaId: string) {
+    const instancias = await this.prisma.instanciaDeProcesso.findMany({
       where: { moduloId, empresaId },
       orderBy: { criadoEm: 'desc' },
+    });
+    if (instancias.length === 0) return [];
+
+    // Cada instância trava numa versão do fluxo (Global Constraints): a etapa
+    // atual precisa ser resolvida a partir do `etapaAtualId` de cada instância,
+    // nunca do rascunho de fluxo mais recente, pra continuar correta em
+    // instâncias antigas mesmo depois do builder evoluir o fluxo.
+    const etapaIds = [...new Set(instancias.map((i) => i.etapaAtualId))];
+    const etapas = await this.prisma.etapa.findMany({
+      where: { id: { in: etapaIds } },
+      include: { macroetapa: true },
+    });
+    const etapaPorId = new Map(etapas.map((e) => [e.id, e]));
+
+    return instancias.map((instancia) => {
+      const etapa = etapaPorId.get(instancia.etapaAtualId);
+      return {
+        ...instancia,
+        etapaAtualNome: etapa?.nome ?? '—',
+        macroetapaAtualId: etapa?.macroetapaId ?? '',
+        macroetapaAtualNome: etapa?.macroetapa.nome ?? '—',
+      };
     });
   }
 

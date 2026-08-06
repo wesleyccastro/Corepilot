@@ -264,4 +264,43 @@ describe('OrquestradorEngineService', () => {
       );
     });
   });
+
+  describe('listar', () => {
+    it('resolve o nome da etapa e da macroetapa atuais de cada instância, mesmo de versões antigas do fluxo', async () => {
+      const prisma = buildPrisma();
+      (prisma.instanciaDeProcesso.findMany as jest.Mock).mockResolvedValue([
+        { id: 'inst-1', etapaAtualId: 'e-2' },
+      ]);
+      (prisma.etapa.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: 'e-2',
+          nome: 'IA confere e agrupa',
+          macroetapaId: 'me-1',
+          macroetapa: { id: 'me-1', nome: 'Triagem' },
+        },
+      ]);
+      const service = new OrquestradorEngineService(prisma);
+
+      const resultado = await service.listar('modulo-1', 'empresa-1');
+
+      expect(resultado[0]).toEqual(
+        expect.objectContaining({
+          etapaAtualNome: 'IA confere e agrupa',
+          macroetapaAtualId: 'me-1',
+          macroetapaAtualNome: 'Triagem',
+        }),
+      );
+    });
+
+    it('devolve lista vazia sem consultar etapas quando não há instâncias', async () => {
+      const prisma = buildPrisma();
+      (prisma.instanciaDeProcesso.findMany as jest.Mock).mockResolvedValue([]);
+      const service = new OrquestradorEngineService(prisma);
+
+      const resultado = await service.listar('modulo-1', 'empresa-1');
+
+      expect(resultado).toEqual([]);
+      expect(prisma.etapa.findMany).not.toHaveBeenCalled();
+    });
+  });
 });
