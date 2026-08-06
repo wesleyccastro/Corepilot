@@ -105,6 +105,7 @@ export interface AcaoEtapa {
 export interface InstanciaDetalhe {
   instancia: InstanciaDeProcesso;
   etapaAtual: Etapa;
+  etapas: Etapa[];
   acoes: AcaoEtapa[];
   historico: ExecucaoDeEtapa[];
 }
