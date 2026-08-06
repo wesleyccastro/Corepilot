@@ -54,8 +54,7 @@ export function TelaDeInteracao({ state, actions }: { state: CorePilotState; act
                 key={campo.id}
                 field={campo}
                 valor={(detalhe.instancia.dadosAcumulados[detalhe.etapaAtual.id] as Record<string, unknown> | undefined)?.[campo.id]}
-                modo="edicao"
-                onChange={() => {}}
+                modo="leitura"
               />
             ))}
             {detalhe.etapaAtual.camposUsuario.length === 0 && (
