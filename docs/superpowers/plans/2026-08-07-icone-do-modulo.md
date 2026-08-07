@@ -1,0 +1,577 @@
+# Biblioteca de ícones (lucide-react) no cadastro de módulo — Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Trocar o seletor de ícone do módulo (hoje 5 quadrados fixos que renderizam todos o mesmo `LayersIcon` genérico) por um seletor de verdade sobre o catálogo completo do `lucide-react`, com busca por nome, e conectar o ícone escolhido nos dois lugares do app que listam módulos (Header e AdminModulos), que hoje ignoram `Modulo.icone`.
+
+**Architecture:** `lucideIcons.ts` expõe o catálogo filtrado (nomes canônicos, sem os aliases redundantes `NomeIcon`/`LucideNome`) e uma função `resolveModuleIcon(nome)` com fallback pra `Layers` e alias pras 5 chaves antigas. `IconPicker.tsx` é um componente de botão+popover reutilizável que usa esse catálogo. `Modulo.icone` continua sendo uma string livre no banco — zero mudança de schema/backend.
+
+**Tech Stack:** React 19 + TypeScript, `lucide-react` (nova dependência), estilo inline com os tokens de `frontend/src/corepilot/styles.ts` (convenção já usada em todo `frontend/src/corepilot/`).
+
+## Global Constraints
+
+- `lucide-react` versão `^0.487.0` (mesma faixa semver dos demais deps do `frontend/package.json` — sem pin exato).
+- Sem mudança de schema Prisma nem de DTO/controller do backend: `Modulo.icone` já é `String?` livre.
+- Sem test runner no frontend — a verificação automatizada disponível em cada task é `npm run build` (`tsc -b && vite build`); lint (`npm run lint`, oxlint) roda como parte da verificação final (Task 7).
+- Seguir a spec em `docs/superpowers/specs/2026-08-07-icone-do-modulo-design.md` — qualquer divergência precisa ser justificada, não silenciosa.
+
+---
+
+### Task 1: Adicionar a dependência `lucide-react`
+
+**Files:**
+- Modify: `frontend/package.json`
+- Modify: `frontend/package-lock.json` (gerado pelo `npm install`, não editar à mão)
+
+**Interfaces:**
+- Produces: pacote `lucide-react` instalado em `frontend/node_modules`, disponível para import em qualquer arquivo `.ts`/`.tsx` de `frontend/src/`.
+
+- [ ] **Step 1: Instalar o pacote**
+
+Run: `cd frontend && npm install lucide-react`
+Expected: adiciona `"lucide-react": "^0.487.0"` (ou versão minor/patch mais recente compatível, ex. `^0.487.x`) em `dependencies` de `frontend/package.json`, e atualiza `frontend/package-lock.json`. Sem erros de peer dependency (lucide-react suporta React 16.5.1+, o projeto usa React 19.2.7).
+
+- [ ] **Step 2: Confirmar que o build continua limpo**
+
+Run: `cd frontend && npm run build`
+Expected: compila sem erros (nada ainda importa `lucide-react`, só confirma que a instalação não quebrou a resolução de tipos/módulos).
+
+- [ ] **Step 3: Commit**
+
+```bash
+cd frontend
+git add package.json package-lock.json
+git commit -m "chore(frontend): adiciona dependência lucide-react"
+```
+
+---
+
+### Task 2: Catálogo de ícones e resolução de nome → componente
+
+**Files:**
+- Create: `frontend/src/corepilot/lucideIcons.ts`
+
+**Interfaces:**
+- Consumes: pacote `lucide-react` (Task 1).
+- Produces:
+  - `allLucideIcons: { nome: string; Icone: LucideIcon }[]` — catálogo completo, nomes canônicos, ordenado alfabeticamente. Usado pelo `IconPicker` (Task 3).
+  - `resolveModuleIcon(nome: string | null | undefined): LucideIcon` — usado pelo `IconPicker` (Task 3), `Header.tsx` (Task 5) e `AdminModulos.tsx` (Task 6).
+
+**Contexto importante para este task:** o barrel de exports do `lucide-react` dá 2-4 nomes pro mesmo ícone (ex.: `Wallet`, `WalletIcon`, `LucideWallet` — os três renderizam o ícone idêntico). Sem filtrar isso, o catálogo de busca mostraria o mesmo ícone várias vezes. O filtro abaixo (excluir prefixo `Lucide` e sufixo `Icon`, mais os 3 exports que não são ícones: `icons`, `createLucideIcon`, `Icon`) foi conferido contra o pacote real (`lucide-react@0.487.0`): reduz ~5300 exports totais pra 1768 nomes canônicos.
+
+- [ ] **Step 1: Criar o arquivo**
+
+```ts
+import * as LucideIcons from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
+// Exports do barrel do lucide-react que não são componentes de ícone.
+const EXPORTS_NAO_ICONES = new Set(['icons', 'createLucideIcon', 'Icon']);
+
+// Cada ícone é exportado com 2-4 aliases (ex: Wallet, WalletIcon,
+// LucideWallet, todos o mesmo componente). Filtra pro nome canônico — sem
+// prefixo "Lucide", sem sufixo "Icon" — pra não listar o mesmo ícone várias
+// vezes na busca do IconPicker.
+export const allLucideIcons: { nome: string; Icone: LucideIcon }[] = Object.entries(LucideIcons)
+  .filter(([nome]) => !EXPORTS_NAO_ICONES.has(nome) && !nome.startsWith('Lucide') && !nome.endsWith('Icon'))
+  .map(([nome, Icone]) => ({ nome, Icone: Icone as LucideIcon }))
+  .sort((a, b) => a.nome.localeCompare(b.nome));
+
+// As 5 chaves do seletor antigo (antes desta mudança), pra não quebrar o
+// ícone de módulos reais já cadastrados com o sistema anterior.
+const ALIAS_LEGADO: Record<string, string> = {
+  leaf: 'Leaf',
+  cart: 'ShoppingCart',
+  wallet: 'Wallet',
+  wrench: 'Wrench',
+  users: 'Users',
+};
+
+export function resolveModuleIcon(nome: string | null | undefined): LucideIcon {
+  if (!nome) return LucideIcons.Layers;
+  const nomeResolvido = ALIAS_LEGADO[nome] ?? nome;
+  return (LucideIcons as unknown as Record<string, LucideIcon>)[nomeResolvido] ?? LucideIcons.Layers;
+}
+```
+
+- [ ] **Step 2: Confirmar que compila**
+
+Run: `cd frontend && npm run build`
+Expected: compila sem erros de tipo.
+
+- [ ] **Step 3: Confirmar o tamanho do catálogo (checagem manual rápida)**
+
+Run: `cd frontend && node --input-type=module -e "
+import * as L from './node_modules/lucide-react/dist/esm/lucide-react.js';
+const EXC = new Set(['icons','createLucideIcon','Icon']);
+const nomes = Object.keys(L).filter(n => !EXC.has(n) && !n.startsWith('Lucide') && !n.endsWith('Icon'));
+console.log('total:', nomes.length);
+console.log('tem Leaf?', nomes.includes('Leaf'), 'tem ShoppingCart?', nomes.includes('ShoppingCart'));
+"`
+Expected: `total: 1768` (ou próximo — pode variar ±alguns se a versão instalada divergir de 0.487.0), `tem Leaf? true tem ShoppingCart? true`. Esse script é só uma checagem manual pontual, não faz parte do código do produto — não precisa ser mantido.
+
+- [ ] **Step 4: Commit**
+
+```bash
+cd frontend
+git add src/corepilot/lucideIcons.ts
+git commit -m "feat(frontend): catálogo de ícones lucide-react e resolveModuleIcon"
+```
+
+---
+
+### Task 3: Componente `IconPicker`
+
+**Files:**
+- Create: `frontend/src/corepilot/components/IconPicker.tsx`
+
+**Interfaces:**
+- Consumes: `allLucideIcons`, `resolveModuleIcon` de `../lucideIcons` (Task 2); `colors`, `overlayFixed`, `inputSm` de `../styles`.
+- Produces: `IconPicker({ value: string; onChange: (nome: string) => void })` — componente React. Usado por `Step1Identity.tsx` (Task 4).
+
+- [ ] **Step 1: Criar o componente**
+
+```tsx
+import { useState } from 'react';
+import { allLucideIcons, resolveModuleIcon } from '../lucideIcons';
+import { colors, overlayFixed, inputSm } from '../styles';
+
+interface IconPickerProps {
+  value: string;
+  onChange: (nome: string) => void;
+}
+
+export function IconPicker({ value, onChange }: IconPickerProps) {
+  const [aberto, setAberto] = useState(false);
+  const [busca, setBusca] = useState('');
+  const IconeAtual = resolveModuleIcon(value);
+
+  const fechar = () => {
+    setAberto(false);
+    setBusca('');
+  };
+
+  const resultados = busca.trim()
+    ? allLucideIcons.filter(({ nome }) => nome.toLowerCase().includes(busca.trim().toLowerCase()))
+    : allLucideIcons;
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <div
+        onClick={() => setAberto((a) => !a)}
+        title={value}
+        style={{ width: 44, height: 44, borderRadius: 10, border: `1.5px solid ${aberto ? colors.teal : colors.border}`, background: aberto ? colors.successBg : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+      >
+        <IconeAtual size={18} color={aberto ? colors.teal : colors.textMuted} />
+      </div>
+      {aberto && (
+        <>
+          <div style={overlayFixed} onClick={fechar} />
+          <div style={{ position: 'absolute', top: 52, left: 0, background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 10, boxShadow: '0 12px 28px rgba(7,54,74,.18)', width: 300, zIndex: 50, padding: 10 }}>
+            <input
+              type="text"
+              autoFocus
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar ícone…"
+              style={{ ...inputSm, width: '100%', marginBottom: 8, boxSizing: 'border-box' }}
+            />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 4, maxHeight: 260, overflowY: 'auto' }}>
+              {resultados.map(({ nome, Icone }) => (
+                <div
+                  key={nome}
+                  onClick={() => { onChange(nome); fechar(); }}
+                  title={nome}
+                  style={{ width: 30, height: 30, borderRadius: 6, border: `1px solid ${value === nome ? colors.teal : 'transparent'}`, background: value === nome ? colors.successBg : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                >
+                  <Icone size={16} color={colors.textMuted} />
+                </div>
+              ))}
+              {resultados.length === 0 && (
+                <div style={{ gridColumn: '1 / -1', fontSize: 12, color: colors.textFaint, textAlign: 'center', padding: '12px 0' }}>
+                  Nenhum ícone encontrado.
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+- [ ] **Step 2: Confirmar que compila**
+
+Run: `cd frontend && npm run build`
+Expected: compila sem erros (o componente ainda não é usado por ninguém — Task 4 conecta).
+
+- [ ] **Step 3: Commit**
+
+```bash
+cd frontend
+git add src/corepilot/components/IconPicker.tsx
+git commit -m "feat(frontend): componente IconPicker (botão + popover de busca)"
+```
+
+---
+
+### Task 4: Conectar o `IconPicker` no Wizard (identidade do módulo)
+
+**Files:**
+- Modify: `frontend/src/corepilot/views/wizard/Step1Identity.tsx`
+- Modify: `frontend/src/corepilot/initialState.ts:303`
+
+**Interfaces:**
+- Consumes: `IconPicker` (Task 3). `actions.selectIcon: (icon: string) => void` já existe em `frontend/src/corepilot/useCorePilotState.ts:139` — assinatura já compatível com `IconPicker`'s `onChange`, sem mudança nele.
+
+- [ ] **Step 1: Trocar o seletor antigo pelo `IconPicker`**
+
+Em `frontend/src/corepilot/views/wizard/Step1Identity.tsx`, o topo do arquivo (linhas 1-13) é hoje:
+
+```tsx
+import type { CorePilotState } from '../../initialState';
+import type { CorePilotActions } from '../../useCorePilotState';
+import { CheckIcon, LayersIcon } from '../../icons';
+import { card, colors, input, label } from '../../styles';
+
+const iconChoices = [
+  { key: 'leaf', label: 'Agro' },
+  { key: 'cart', label: 'Compras' },
+  { key: 'wallet', label: 'Financeiro' },
+  { key: 'wrench', label: 'Manutenção' },
+  { key: 'users', label: 'Pessoas' },
+];
+const colorHexes = ['#0EA5A0', '#07364A', '#E8604C', '#D97706', '#1E9E6B'];
+```
+
+Substituir por (remove `iconChoices` e a importação de `LayersIcon`, que deixam de ser usados; adiciona a importação do `IconPicker`):
+
+```tsx
+import type { CorePilotState } from '../../initialState';
+import type { CorePilotActions } from '../../useCorePilotState';
+import { CheckIcon } from '../../icons';
+import { IconPicker } from '../../components/IconPicker';
+import { card, colors, input, label } from '../../styles';
+
+const colorHexes = ['#0EA5A0', '#07364A', '#E8604C', '#D97706', '#1E9E6B'];
+```
+
+Mais abaixo, o bloco do campo "Ícone" (hoje):
+
+```tsx
+        <div>
+          <label style={{ ...label, marginBottom: 8 }}>Ícone</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {iconChoices.map((ic) => {
+              const active = f.icon === ic.key;
+              return (
+                <div key={ic.key} onClick={() => actions.selectIcon(ic.key)} title={ic.label} style={{ width: 44, height: 44, borderRadius: 10, border: `1.5px solid ${active ? colors.teal : colors.border}`, background: active ? colors.successBg : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' }}>
+                  <LayersIcon size={18} color={active ? colors.teal : colors.textMuted} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+```
+
+Substituir por:
+
+```tsx
+        <div>
+          <label style={{ ...label, marginBottom: 8 }}>Ícone</label>
+          <IconPicker value={f.icon} onChange={actions.selectIcon} />
+        </div>
+```
+
+- [ ] **Step 2: Ajustar o default do formulário**
+
+Em `frontend/src/corepilot/initialState.ts:303`, trocar:
+
+```ts
+      icon: 'leaf',
+```
+
+por:
+
+```ts
+      icon: 'Leaf',
+```
+
+(nome canônico do lucide-react, em vez da chave antiga — só afeta módulos novos; `resolveModuleIcon` já cobre `'leaf'` via `ALIAS_LEGADO` pra módulos existentes que ainda tiverem a chave antiga salva).
+
+- [ ] **Step 3: Confirmar que compila**
+
+Run: `cd frontend && npm run build`
+Expected: compila sem erros. Se sobrar erro de `LayersIcon`/`iconChoices` não usados, confirme que os dois foram removidos do arquivo (Step 1).
+
+- [ ] **Step 4: Commit**
+
+```bash
+cd frontend
+git add src/corepilot/views/wizard/Step1Identity.tsx src/corepilot/initialState.ts
+git commit -m "feat(frontend): usa IconPicker no cadastro de identidade do módulo"
+```
+
+---
+
+### Task 5: Exibir o ícone do módulo nas abas de navegação (`Header`)
+
+**Files:**
+- Modify: `frontend/src/corepilot/components/Header.tsx`
+
+**Interfaces:**
+- Consumes: `resolveModuleIcon` de `../lucideIcons` (Task 2).
+
+- [ ] **Step 1: Importar `resolveModuleIcon`**
+
+Em `frontend/src/corepilot/components/Header.tsx:4`, logo abaixo da importação existente de ícones:
+
+```tsx
+import { BellIcon, BuildingIcon, ChevronDownIcon, GearIcon, LayersIcon, LogoutIcon, PlusIcon, SearchIcon, UsersIcon } from '../icons';
+import { resolveModuleIcon } from '../lucideIcons';
+```
+
+- [ ] **Step 2: Montar o mapa de ícone por aba de módulo**
+
+Logo depois do fechamento do array `navTabs` (depois da linha `];` em `frontend/src/corepilot/components/Header.tsx:34`), adicionar:
+
+```tsx
+  const iconePorTab = new Map(
+    state.publishedModules.map((m) => [`module:${m.id}`, resolveModuleIcon(m.icone)] as const),
+  );
+```
+
+(Só as abas de módulo publicado têm ícone — "Visão Geral"/"Compras"/"Financeiro" continuam sem ícone, são abas fixas do app, não `Modulo.icone`.)
+
+- [ ] **Step 3: Renderizar o ícone na aba**
+
+O loop de render das abas (`frontend/src/corepilot/components/Header.tsx:104-113`) hoje é:
+
+```tsx
+        {navTabs.map((tab) => {
+          const active = tab.id === state.view;
+          return (
+            <div key={tab.id} onClick={() => actions.setView(tab.id)} style={{ padding: '14px 16px', cursor: 'pointer', position: 'relative' }}>
+              <span style={{ fontSize: 14, fontWeight: active ? 700 : 500, color: active ? colors.navy : colors.textMuted }}>{tab.label}</span>
+              {active && <div style={{ position: 'absolute', left: 0, right: 0, bottom: -1, height: 2, background: colors.teal }} />}
+            </div>
+          );
+        })}
+```
+
+Substituir por:
+
+```tsx
+        {navTabs.map((tab) => {
+          const active = tab.id === state.view;
+          const IconeTab = iconePorTab.get(tab.id);
+          return (
+            <div key={tab.id} onClick={() => actions.setView(tab.id)} style={{ padding: '14px 16px', cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center', gap: 6 }}>
+              {IconeTab && <IconeTab size={14} color={active ? colors.navy : colors.textMuted} />}
+              <span style={{ fontSize: 14, fontWeight: active ? 700 : 500, color: active ? colors.navy : colors.textMuted }}>{tab.label}</span>
+              {active && <div style={{ position: 'absolute', left: 0, right: 0, bottom: -1, height: 2, background: colors.teal }} />}
+            </div>
+          );
+        })}
+```
+
+- [ ] **Step 4: Confirmar que compila**
+
+Run: `cd frontend && npm run build`
+Expected: compila sem erros.
+
+- [ ] **Step 5: Commit**
+
+```bash
+cd frontend
+git add src/corepilot/components/Header.tsx
+git commit -m "feat(frontend): exibe o ícone do módulo nas abas de navegação"
+```
+
+---
+
+### Task 6: Exibir o ícone do módulo na lista de administração (`AdminModulos`)
+
+**Files:**
+- Modify: `frontend/src/corepilot/views/admin/AdminModulos.tsx`
+
+**Interfaces:**
+- Consumes: `resolveModuleIcon` de `../../lucideIcons` (Task 2).
+
+- [ ] **Step 1: Importar `resolveModuleIcon`**
+
+Em `frontend/src/corepilot/views/admin/AdminModulos.tsx:4`, logo abaixo da importação de `colors`:
+
+```tsx
+import { colors } from '../../styles';
+import { resolveModuleIcon } from '../../lucideIcons';
+import { ExcluirModuloDialog } from '../../components/ExcluirModuloDialog';
+```
+
+- [ ] **Step 2: Renderizar o ícone em cada linha**
+
+O `.map` da lista (`frontend/src/corepilot/views/admin/AdminModulos.tsx:26-78`) hoje começa com corpo em expressão (`=> ( ... )`). Trocar pra corpo em bloco pra poder resolver o ícone antes do JSX. O bloco completo hoje é:
+
+```tsx
+        {state.todosModulos.map((modulo) => (
+          <div key={modulo.id} style={{ display: 'flex', alignItems: 'center', gap: 14, border: `1px solid ${colors.border}`, borderRadius: 10, padding: '13px 16px' }}>
+            <div style={{ width: 10, height: 10, borderRadius: '50%', background: modulo.ativo ? colors.success : colors.textFaint, flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700 }}>{modulo.nome}</div>
+              <div style={{ fontSize: 12, color: colors.textFaint }}>{modulo.objetivo}</div>
+            </div>
+            <span
+              style={{
+                background: modulo.ativo ? colors.successBg : colors.chipBg,
+                color: modulo.ativo ? colors.success : colors.textMuted,
+                borderRadius: 20,
+                padding: '4px 12px',
+                fontSize: 11.5,
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {modulo.ativo ? 'Ativo' : 'Inativo'}
+            </span>
+            {modulo.ativo ? (
+              <button
+                onClick={() =>
+                  actions.abrirConfirmacao({
+                    titulo: 'Desativar módulo',
+                    mensagem: `"${modulo.nome}" vai sair da navegação principal. As conversas, agentes e consultas dele continuam guardados, e você pode reativar por aqui quando quiser.`,
+                    confirmarLabel: 'Desativar',
+                    perigo: true,
+                    onConfirmar: () => void actions.alternarStatusModulo(modulo.id, false),
+                  })
+                }
+                style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 7, padding: '7px 12px', fontSize: 12, fontWeight: 600, color: colors.danger, cursor: 'pointer' }}
+              >
+                Desativar
+              </button>
+            ) : (
+              <button
+                onClick={() => void actions.alternarStatusModulo(modulo.id, true)}
+                style={{ background: colors.teal, border: 'none', borderRadius: 7, padding: '7px 12px', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer' }}
+              >
+                Ativar
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={() => actions.abrirExclusaoModulo(modulo)}
+                style={{ background: '#fff', border: `1px solid ${colors.danger}`, borderRadius: 7, padding: '7px 12px', fontSize: 12, fontWeight: 600, color: colors.danger, cursor: 'pointer' }}
+              >
+                Excluir
+              </button>
+            )}
+          </div>
+        ))}
+```
+
+Substituir por (só muda a assinatura do `.map` pra corpo em bloco, adiciona a resolução do ícone e o `<IconeModulo />`, resto idêntico):
+
+```tsx
+        {state.todosModulos.map((modulo) => {
+          const IconeModulo = resolveModuleIcon(modulo.icone);
+          return (
+          <div key={modulo.id} style={{ display: 'flex', alignItems: 'center', gap: 14, border: `1px solid ${colors.border}`, borderRadius: 10, padding: '13px 16px' }}>
+            <div style={{ width: 10, height: 10, borderRadius: '50%', background: modulo.ativo ? colors.success : colors.textFaint, flexShrink: 0 }} />
+            <IconeModulo size={18} color={colors.textMuted} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700 }}>{modulo.nome}</div>
+              <div style={{ fontSize: 12, color: colors.textFaint }}>{modulo.objetivo}</div>
+            </div>
+            <span
+              style={{
+                background: modulo.ativo ? colors.successBg : colors.chipBg,
+                color: modulo.ativo ? colors.success : colors.textMuted,
+                borderRadius: 20,
+                padding: '4px 12px',
+                fontSize: 11.5,
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {modulo.ativo ? 'Ativo' : 'Inativo'}
+            </span>
+            {modulo.ativo ? (
+              <button
+                onClick={() =>
+                  actions.abrirConfirmacao({
+                    titulo: 'Desativar módulo',
+                    mensagem: `"${modulo.nome}" vai sair da navegação principal. As conversas, agentes e consultas dele continuam guardados, e você pode reativar por aqui quando quiser.`,
+                    confirmarLabel: 'Desativar',
+                    perigo: true,
+                    onConfirmar: () => void actions.alternarStatusModulo(modulo.id, false),
+                  })
+                }
+                style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 7, padding: '7px 12px', fontSize: 12, fontWeight: 600, color: colors.danger, cursor: 'pointer' }}
+              >
+                Desativar
+              </button>
+            ) : (
+              <button
+                onClick={() => void actions.alternarStatusModulo(modulo.id, true)}
+                style={{ background: colors.teal, border: 'none', borderRadius: 7, padding: '7px 12px', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer' }}
+              >
+                Ativar
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={() => actions.abrirExclusaoModulo(modulo)}
+                style={{ background: '#fff', border: `1px solid ${colors.danger}`, borderRadius: 7, padding: '7px 12px', fontSize: 12, fontWeight: 600, color: colors.danger, cursor: 'pointer' }}
+              >
+                Excluir
+              </button>
+            )}
+          </div>
+          );
+        })}
+```
+
+- [ ] **Step 3: Confirmar que compila**
+
+Run: `cd frontend && npm run build`
+Expected: compila sem erros.
+
+- [ ] **Step 4: Commit**
+
+```bash
+cd frontend
+git add src/corepilot/views/admin/AdminModulos.tsx
+git commit -m "feat(frontend): exibe o ícone do módulo na lista de administração"
+```
+
+---
+
+### Task 7: Verificação final
+
+**Files:** nenhum novo — só verificação.
+
+- [ ] **Step 1: Build e lint completos**
+
+Run: `cd frontend && npm run build && npm run lint`
+Expected: `tsc -b`, `vite build` e `oxlint` (`npm run lint`) sem erros.
+
+- [ ] **Step 2: Checagem visual manual**
+
+Run: `cd frontend && npm run dev` (e `cd backend && npm run start:dev` se for testar salvamento real de módulo, não só a UI do picker).
+
+No navegador: abrir "Criar módulo" (Wizard), no campo "Ícone" clicar no botão — deve abrir o popover com busca. Digitar algo como "cart" — deve filtrar e mostrar `ShoppingCart` (entre outros resultados com "cart" no nome). Clicar num ícone — o popover fecha e o botão passa a mostrar o ícone escolhido. Se salvar o módulo (passo 1 do wizard, botão de avançar), o ícone escolhido deve aparecer na aba do módulo no `Header` (menu de navegação superior) e na lista de `AdminModulos` (menu do usuário → Módulos). Nenhum erro no console do navegador.
+
+Esta sessão não tem ferramenta de automação de browser disponível — este step depende de quem estiver acompanhando a implementação clicar através da UI (subagent-driven-development: reportar como pendente de confirmação humana no review; inline: pedir para o usuário confirmar).
+
+- [ ] **Step 3: Encerrar os servidores de teste (se subiu algum no Step 2)**
+
+Identificar os PIDs de `node.exe` cuja `CommandLine` referencia `Corepilot\backend`/`Corepilot\frontend` (`Get-CimInstance Win32_Process -Filter "Name='node.exe'"` no PowerShell) e encerrar só esses.
+
+- [ ] **Step 4: Commit final (se sobrar algo)**
+
+```bash
+cd /c/Git/Corepilot
+git status --short
+```
+
+Se houver mudanças pendentes relacionadas a este plano, `git add` só os arquivos relevantes e commitar. Não commitar nada que não tenha sido tocado por este plano.
