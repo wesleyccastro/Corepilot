@@ -2,6 +2,7 @@ import type { CorePilotState } from '../../initialState';
 import type { CorePilotActions } from '../../useCorePilotState';
 import type { MeResponse } from '../../useMe';
 import { colors } from '../../styles';
+import { resolveModuleIcon } from '../../lucideIcons';
 import { ExcluirModuloDialog } from '../../components/ExcluirModuloDialog';
 
 export function AdminModulos({ state, actions, me }: { state: CorePilotState; actions: CorePilotActions; me: MeResponse | null }) {
@@ -23,9 +24,12 @@ export function AdminModulos({ state, actions, me }: { state: CorePilotState; ac
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {state.todosModulos.map((modulo) => (
+        {state.todosModulos.map((modulo) => {
+          const IconeModulo = resolveModuleIcon(modulo.icone);
+          return (
           <div key={modulo.id} style={{ display: 'flex', alignItems: 'center', gap: 14, border: `1px solid ${colors.border}`, borderRadius: 10, padding: '13px 16px' }}>
             <div style={{ width: 10, height: 10, borderRadius: '50%', background: modulo.ativo ? colors.success : colors.textFaint, flexShrink: 0 }} />
+            <IconeModulo size={18} color={colors.textMuted} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13.5, fontWeight: 700 }}>{modulo.nome}</div>
               <div style={{ fontSize: 12, color: colors.textFaint }}>{modulo.objetivo}</div>
@@ -75,7 +79,8 @@ export function AdminModulos({ state, actions, me }: { state: CorePilotState; ac
               </button>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <ExcluirModuloDialog state={state} actions={actions} />
