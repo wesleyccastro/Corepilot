@@ -1,6 +1,7 @@
 import { OrquestradorFilaWorker } from './orquestrador-fila.worker';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { AnthropicService } from '../chat/anthropic.service';
+import type { SkillExecutorService } from '../skill/skill-executor.service';
 import type { OrquestradorEngineService } from './orquestrador-engine.service';
 import type { ConfigService } from '@nestjs/config';
 import { criptografar } from '../fonte-de-dados/crypto';
@@ -22,6 +23,9 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
     const anthropicService = {
       parseStructured: jest.fn(),
     } as unknown as AnthropicService;
+    const skillExecutorService = {
+      executar: jest.fn(),
+    } as unknown as SkillExecutorService;
     const engine = {
       avancar: jest.fn(),
     } as unknown as OrquestradorEngineService;
@@ -31,7 +35,14 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
     const config = {
       getOrThrow: jest.fn().mockReturnValue('a'.repeat(64)),
     } as unknown as ConfigService;
-    return { prisma, anthropicService, engine, evolutionApi, config };
+    return {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    };
   }
 
   const execucaoPendente = {
@@ -52,27 +63,36 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
         guardrails: null,
         regraEscalonamento: null,
         modeloIA: 'claude-sonnet-5',
+        modulo: { instrucoes: null as string | null },
       },
       skill: {
         objetivo: 'Agrupar itens por família',
         camposSaida: [{ nome: 'grupos', tipo: 'string[]', obrigatorio: true }],
+        ferramentas: [] as { id: string; nome: string; camposFiltro: unknown }[],
       },
     },
   };
 
   it('processa uma execução de agente pendente, grava a saída e avança', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     (prisma.execucaoDeEtapa.findMany as jest.Mock)
       .mockResolvedValueOnce([]) // recuperarExecucoesTravadas
       .mockResolvedValueOnce([execucaoPendente]); // pendentes
-    (anthropicService.parseStructured as jest.Mock).mockResolvedValue({
-      parsed_output: { grupos: ['parafusos'] },
+    (skillExecutorService.executar as jest.Mock).mockResolvedValue({
+      output: { grupos: ['parafusos'] },
       usage: { input_tokens: 100, output_tokens: 20 },
     });
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -96,19 +116,81 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
     expect(engine.avancar).toHaveBeenCalledWith('inst-1', 'e-2');
   });
 
-  it('reseta a instância pra "em_andamento" no caminho de sucesso, desfazendo um "erro" deixado por um sweep de travadas anterior (C3)', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+  it('passa as ferramentas da skill e as instruções do módulo pro SkillExecutorService', async () => {
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
+    const execucaoComFerramentasEInstrucoes = {
+      ...execucaoPendente,
+      etapa: {
+        ...execucaoPendente.etapa,
+        agente: {
+          ...execucaoPendente.etapa.agente,
+          modulo: { instrucoes: 'Sempre responda em português.' },
+        },
+        skill: {
+          ...execucaoPendente.etapa.skill,
+          ferramentas: [
+            { id: 'consulta-1', nome: 'Estoque', camposFiltro: [] },
+          ],
+        },
+      },
+    };
     (prisma.execucaoDeEtapa.findMany as jest.Mock)
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([execucaoPendente]);
-    (anthropicService.parseStructured as jest.Mock).mockResolvedValue({
-      parsed_output: { grupos: ['parafusos'] },
+      .mockResolvedValueOnce([execucaoComFerramentasEInstrucoes]);
+    (skillExecutorService.executar as jest.Mock).mockResolvedValue({
+      output: { grupos: ['parafusos'] },
       usage: { input_tokens: 100, output_tokens: 20 },
     });
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    );
+
+    await worker.processarFilaAgentes();
+
+    expect(skillExecutorService.executar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modulo: { instrucoes: 'Sempre responda em português.' },
+        skill: expect.objectContaining({
+          ferramentas: [
+            { id: 'consulta-1', nome: 'Estoque', camposFiltro: [] },
+          ],
+        }),
+      }),
+    );
+  });
+
+  it('reseta a instância pra "em_andamento" no caminho de sucesso, desfazendo um "erro" deixado por um sweep de travadas anterior (C3)', async () => {
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
+    (prisma.execucaoDeEtapa.findMany as jest.Mock)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([execucaoPendente]);
+    (skillExecutorService.executar as jest.Mock).mockResolvedValue({
+      output: { grupos: ['parafusos'] },
+      usage: { input_tokens: 100, output_tokens: 20 },
+    });
+    const worker = new OrquestradorFilaWorker(
+      prisma,
+      anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -125,18 +207,25 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
   });
 
   it('limpa uma mensagemErro deixada por um sweep de travadas anterior ao concluir com sucesso', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     (prisma.execucaoDeEtapa.findMany as jest.Mock)
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([execucaoPendente]);
-    (anthropicService.parseStructured as jest.Mock).mockResolvedValue({
-      parsed_output: { grupos: ['parafusos'] },
+    (skillExecutorService.executar as jest.Mock).mockResolvedValue({
+      output: { grupos: ['parafusos'] },
       usage: { input_tokens: 100, output_tokens: 20 },
     });
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -153,8 +242,14 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
   });
 
   it('filtra a entrada da Skill pelas entradaRefs da etapa', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     const execucaoComMaisDados = {
       ...execucaoPendente,
       instancia: {
@@ -168,13 +263,14 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
     (prisma.execucaoDeEtapa.findMany as jest.Mock)
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([execucaoComMaisDados]);
-    (anthropicService.parseStructured as jest.Mock).mockResolvedValue({
-      parsed_output: { grupos: [] },
+    (skillExecutorService.executar as jest.Mock).mockResolvedValue({
+      output: { grupos: [] },
       usage: { input_tokens: 1, output_tokens: 1 },
     });
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -182,24 +278,31 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
 
     await worker.processarFilaAgentes();
 
-    const mensagemEnviada = (anthropicService.parseStructured as jest.Mock).mock
-      .calls[0][0].mensagem as string;
-    expect(mensagemEnviada).toContain('itens');
-    expect(mensagemEnviada).not.toContain('irrelevante');
+    const entradaEnviada = (skillExecutorService.executar as jest.Mock).mock
+      .calls[0][0].entrada as string;
+    expect(entradaEnviada).toContain('itens');
+    expect(entradaEnviada).not.toContain('irrelevante');
   });
 
-  it('marca a execução e a instância como falha quando a Anthropic lança erro', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+  it('marca a execução e a instância como falha quando o SkillExecutorService lança erro', async () => {
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     (prisma.execucaoDeEtapa.findMany as jest.Mock)
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([execucaoPendente]);
-    (anthropicService.parseStructured as jest.Mock).mockRejectedValue(
+    (skillExecutorService.executar as jest.Mock).mockRejectedValue(
       new Error('timeout'),
     );
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -221,8 +324,14 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
   });
 
   it('continua para a próxima execução mesmo se uma falhar', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     const segunda = {
       ...execucaoPendente,
       id: 'exec-2',
@@ -231,15 +340,16 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
     (prisma.execucaoDeEtapa.findMany as jest.Mock)
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([execucaoPendente, segunda]);
-    (anthropicService.parseStructured as jest.Mock)
+    (skillExecutorService.executar as jest.Mock)
       .mockRejectedValueOnce(new Error('timeout'))
       .mockResolvedValueOnce({
-        parsed_output: { grupos: [] },
+        output: { grupos: [] },
         usage: { input_tokens: 1, output_tokens: 1 },
       });
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -251,13 +361,19 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
   });
 
   it('mantém a execução "done" quando avancar falha depois do commit', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     (prisma.execucaoDeEtapa.findMany as jest.Mock)
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([execucaoPendente]);
-    (anthropicService.parseStructured as jest.Mock).mockResolvedValue({
-      parsed_output: { grupos: ['parafusos'] },
+    (skillExecutorService.executar as jest.Mock).mockResolvedValue({
+      output: { grupos: ['parafusos'] },
       usage: { input_tokens: 100, output_tokens: 20 },
     });
     (engine.avancar as jest.Mock).mockRejectedValue(
@@ -266,6 +382,7 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -294,19 +411,21 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
   });
 
   it('não propaga uma falha inesperada fora do loop por execução (ex.: blip no recuperarExecucoesTravadas) — o tick não pode derrubar o processo', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
-    // @nestjs/schedule chama este método via setInterval puro, sem .catch();
-    // se esta rejeição escapasse, seria uma unhandled rejection derrubando a
-    // API inteira a cada 5s. O try/catch por execução dentro do for não
-    // protege esta falha porque ela acontece ANTES do loop, dentro do
-    // recuperarExecucoesTravadas.
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     (prisma.execucaoDeEtapa.findMany as jest.Mock).mockRejectedValueOnce(
       new Error('Supabase indisponível'),
     );
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -339,6 +458,9 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
     const anthropicService = {
       parseStructured: jest.fn(),
     } as unknown as AnthropicService;
+    const skillExecutorService = {
+      executar: jest.fn(),
+    } as unknown as SkillExecutorService;
     const engine = {
       avancar: jest.fn(),
     } as unknown as OrquestradorEngineService;
@@ -348,7 +470,14 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
     const config = {
       getOrThrow: jest.fn().mockReturnValue('a'.repeat(64)),
     } as unknown as ConfigService;
-    return { prisma, anthropicService, engine, evolutionApi, config };
+    return {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    };
   }
 
   const integracaoSalva = {
@@ -369,8 +498,14 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
   };
 
   it('envia via Evolution API com o texto padrão numa etapa de integração pura, e avança', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     (prisma.execucaoDeEtapa.findMany as jest.Mock)
       .mockResolvedValueOnce([]) // recuperarExecucoesTravadas
       .mockResolvedValueOnce([execucaoIntegracaoPura]); // pendentes
@@ -383,6 +518,7 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -403,8 +539,14 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
   });
 
   it('reseta a instância pra "em_andamento" no caminho de sucesso do envio de WhatsApp (C3)', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     (prisma.execucaoDeEtapa.findMany as jest.Mock)
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([execucaoIntegracaoPura]);
@@ -417,6 +559,7 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -431,8 +574,14 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
   });
 
   it('limpa uma mensagemErro deixada por um sweep de travadas anterior ao concluir o envio com sucesso', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     (prisma.execucaoDeEtapa.findMany as jest.Mock)
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([execucaoIntegracaoPura]);
@@ -445,6 +594,7 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -461,8 +611,14 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
   });
 
   it('numa etapa agente_mais_integracao, redige a mensagem com a Anthropic antes de enviar', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     const execucaoComAgente = {
       ...execucaoIntegracaoPura,
       etapa: {
@@ -486,6 +642,7 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -502,8 +659,14 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
   });
 
   it('marca falha e instância em erro quando não há telefone de destino nem na instância nem na integração', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     (prisma.execucaoDeEtapa.findMany as jest.Mock)
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([execucaoIntegracaoPura]);
@@ -514,6 +677,7 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -529,8 +693,14 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
   });
 
   it('reivindicação atômica evita envio duplicado quando um segundo tick concorrente pega a mesma execução pendente', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     // Simula duas execuções "concorrentes" do @Interval: ambas enxergam a
     // mesma linha pending (o mock de findMany não reflete a escrita da
     // primeira tick), mas só a primeira consegue reivindicá-la — o
@@ -553,6 +723,7 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -566,8 +737,14 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
   });
 
   it('recupera uma execução travada em processing que não foi reivindicada por este processo, mesmo recém-criada (sem limiar de tempo)', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     // Sem `criadoEm` no fixture de propósito: a recuperação de travadas não
     // depende mais de idade da linha (ver C3), só de ela não estar no Set de
     // execuções reivindicadas por este processo — então mesmo "recém-criada"
@@ -579,6 +756,7 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -609,12 +787,19 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
   });
 
   it('exclui do filtro de travadas qualquer execução que este processo reivindicou e ainda não terminou de processar', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     (prisma.execucaoDeEtapa.findMany as jest.Mock).mockResolvedValue([]);
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -645,12 +830,19 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
   });
 
   it('não remove do Set um id que já pertencia a OUTRA chamada em andamento quando esta chamada perde a reivindicação (updateMany count: 0)', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     (prisma.execucaoDeEtapa.findMany as jest.Mock).mockResolvedValue([]);
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -690,8 +882,14 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
   });
 
   it('remove do Set uma reivindicação que não se confirmou (updateMany count: 0)', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     (prisma.execucaoDeEtapa.findMany as jest.Mock).mockResolvedValue([]);
     (prisma.execucaoDeEtapa.updateMany as jest.Mock).mockResolvedValueOnce({
       count: 0, // outro tick já reivindicou a linha primeiro
@@ -699,6 +897,7 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -717,8 +916,14 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
   });
 
   it('remove do Set e propaga o erro se o updateMany da reivindicação lançar', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     (prisma.execucaoDeEtapa.findMany as jest.Mock).mockResolvedValue([]);
     (prisma.execucaoDeEtapa.updateMany as jest.Mock).mockRejectedValueOnce(
       new Error('conexão perdida'),
@@ -726,6 +931,7 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -742,8 +948,14 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
   });
 
   it('remove a execução do Set de reivindicadas ao terminar de processar (sucesso ou falha), voltando a ficar sujeita ao sweep', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     (prisma.execucaoDeEtapa.findMany as jest.Mock)
       .mockResolvedValueOnce([]) // recuperarExecucoesTravadas
       .mockResolvedValueOnce([execucaoIntegracaoPura]); // pendentes
@@ -756,6 +968,7 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -774,8 +987,14 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
   });
 
   it('não sobrescreve nem toca a instância quando a execução travada termina entre ser encontrada e a recuperação', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     const execucaoTravada = { id: 'exec-travada', instanciaId: 'inst-2' };
     (prisma.execucaoDeEtapa.findMany as jest.Mock)
       .mockResolvedValueOnce([execucaoTravada]) // recuperarExecucoesTravadas encontra a linha travada
@@ -790,6 +1009,7 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -807,14 +1027,21 @@ describe('OrquestradorFilaWorker — processarFilaIntegracoes', () => {
   });
 
   it('não propaga uma falha inesperada fora do loop por execução (ex.: blip no recuperarExecucoesTravadas) — o tick não pode derrubar o processo', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     (prisma.execucaoDeEtapa.findMany as jest.Mock).mockRejectedValueOnce(
       new Error('Supabase indisponível'),
     );
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -846,6 +1073,9 @@ describe('OrquestradorFilaWorker — onApplicationBootstrap (sweep de partida)',
     const anthropicService = {
       parseStructured: jest.fn(),
     } as unknown as AnthropicService;
+    const skillExecutorService = {
+      executar: jest.fn(),
+    } as unknown as SkillExecutorService;
     const engine = {
       avancar: jest.fn(),
     } as unknown as OrquestradorEngineService;
@@ -855,12 +1085,25 @@ describe('OrquestradorFilaWorker — onApplicationBootstrap (sweep de partida)',
     const config = {
       getOrThrow: jest.fn().mockReturnValue('a'.repeat(64)),
     } as unknown as ConfigService;
-    return { prisma, anthropicService, engine, evolutionApi, config };
+    return {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    };
   }
 
   it('na subida da aplicação, recupera incondicionalmente toda execução "processing" de agente e de integração encontrada', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     // Sem nenhum limiar de tempo/idade envolvido: o Set em memória está
     // garantidamente vazio recém-subido o processo, então qualquer linha
     // "processing" encontrada aqui só pode ser resquício de uma instância
@@ -879,6 +1122,7 @@ describe('OrquestradorFilaWorker — onApplicationBootstrap (sweep de partida)',
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,
@@ -911,8 +1155,14 @@ describe('OrquestradorFilaWorker — onApplicationBootstrap (sweep de partida)',
   });
 
   it('não propaga uma falha do sweep de partida (ex.: blip transitório do banco) — a API não pode cair por causa disso', async () => {
-    const { prisma, anthropicService, engine, evolutionApi, config } =
-      buildDeps();
+    const {
+      prisma,
+      anthropicService,
+      skillExecutorService,
+      engine,
+      evolutionApi,
+      config,
+    } = buildDeps();
     // main.ts's bootstrap() não tem .catch(): se isso escapasse como uma
     // rejeição não tratada, derrubaria o processo inteiro (todos os
     // endpoints HTTP), não só o worker — bem pior do que a recuperação de
@@ -924,6 +1174,7 @@ describe('OrquestradorFilaWorker — onApplicationBootstrap (sweep de partida)',
     const worker = new OrquestradorFilaWorker(
       prisma,
       anthropicService,
+      skillExecutorService,
       engine,
       evolutionApi,
       config,

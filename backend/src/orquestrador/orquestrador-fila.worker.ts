@@ -4,44 +4,35 @@ import { Interval } from '@nestjs/schedule';
 import type {
   Agente,
   AtorExecucao,
+  ConsultaParametrizada,
   Etapa,
   ExecucaoDeEtapa,
   InstanciaDeProcesso,
+  Modulo,
   Prisma,
   Skill,
 } from '@prisma/client';
 import { z } from 'zod';
 import { PrismaService } from '../prisma/prisma.service';
 import { AnthropicService } from '../chat/anthropic.service';
-import { construirSchemaSaida, type CampoSaida } from '../skill/schema-builder';
+import { SkillExecutorService } from '../skill/skill-executor.service';
+import type { CampoSaida } from '../skill/schema-builder';
 import { descriptografar } from '../fonte-de-dados/crypto';
 import { EvolutionApiAdapterService } from '../integracao-whatsapp/evolution-api-adapter.service';
 import { OrquestradorEngineService } from './orquestrador-engine.service';
 
 type ExecucaoDeAgente = ExecucaoDeEtapa & {
   instancia: InstanciaDeProcesso;
-  etapa: Etapa & { agente: Agente | null; skill: Skill | null };
+  etapa: Etapa & {
+    agente: (Agente & { modulo: Modulo }) | null;
+    skill: (Skill & { ferramentas: ConsultaParametrizada[] }) | null;
+  };
 };
 
 type ExecucaoDeIntegracao = ExecucaoDeEtapa & {
   instancia: InstanciaDeProcesso;
   etapa: Etapa & { agente: Agente | null };
 };
-
-function montarSystemPromptDaEtapa(agente: Agente, skill: Skill): string {
-  const partes = [
-    `Você é o agente "${agente.nome}" (${agente.funcao}) desta empresa.`,
-    `Objetivo do agente: ${agente.objetivo}`,
-    `Você está executando a etapa "${skill.objetivo}" de um processo automatizado.`,
-  ];
-  if (agente.guardrails?.trim())
-    partes.push(`RESTRIÇÕES (nunca viole):\n${agente.guardrails.trim()}`);
-  if (agente.regraEscalonamento?.trim())
-    partes.push(
-      `ESCALONAMENTO PARA HUMANO:\n${agente.regraEscalonamento.trim()}`,
-    );
-  return partes.join('\n\n');
-}
 
 @Injectable()
 export class OrquestradorFilaWorker implements OnApplicationBootstrap {
@@ -68,6 +59,7 @@ export class OrquestradorFilaWorker implements OnApplicationBootstrap {
   constructor(
     private readonly prisma: PrismaService,
     private readonly anthropicService: AnthropicService,
+    private readonly skillExecutorService: SkillExecutorService,
     private readonly engine: OrquestradorEngineService,
     private readonly evolutionApi: EvolutionApiAdapterService,
     private readonly config: ConfigService,
@@ -231,7 +223,12 @@ export class OrquestradorFilaWorker implements OnApplicationBootstrap {
         take: 5,
         include: {
           instancia: true,
-          etapa: { include: { agente: true, skill: true } },
+          etapa: {
+            include: {
+              agente: { include: { modulo: true } },
+              skill: { include: { ferramentas: true } },
+            },
+          },
         },
       })) as ExecucaoDeAgente[];
 
@@ -310,18 +307,18 @@ export class OrquestradorFilaWorker implements OnApplicationBootstrap {
     }
 
     const entrada = this.montarEntrada(instancia, etapa);
-    const schema = construirSchemaSaida(
-      etapa.skill.camposSaida as unknown as CampoSaida[],
-    );
-    const response = await this.anthropicService.parseStructured({
-      system: montarSystemPromptDaEtapa(etapa.agente, etapa.skill),
-      mensagem: JSON.stringify(entrada),
-      model: etapa.agente.modeloIA,
-      maxTokens: 4096,
-      schema,
+    const { output, usage } = await this.skillExecutorService.executar({
+      agente: etapa.agente,
+      modulo: etapa.agente.modulo,
+      skill: {
+        objetivo: etapa.skill.objetivo,
+        camposSaida: etapa.skill.camposSaida as unknown as CampoSaida[],
+        ferramentas: etapa.skill.ferramentas,
+      },
+      entrada: JSON.stringify(entrada),
     });
 
-    if (!response.parsed_output) {
+    if (!output) {
       throw new Error(
         'A saída do agente não pôde ser validada contra o schema da skill',
       );
@@ -333,16 +330,16 @@ export class OrquestradorFilaWorker implements OnApplicationBootstrap {
     // fluxo.service.ts's clonarComoRascunho e orquestrador-engine.service.ts).
     const dadosAcumulados = {
       ...(instancia.dadosAcumulados as Record<string, unknown>),
-      [etapa.id]: response.parsed_output,
+      [etapa.id]: output,
     };
     await this.prisma.$transaction(async (tx) => {
       await tx.execucaoDeEtapa.update({
         where: { id: execucao.id },
         data: {
           status: 'done',
-          output: response.parsed_output as Prisma.InputJsonValue,
-          tokensEntrada: response.usage.input_tokens,
-          tokensSaida: response.usage.output_tokens,
+          output: output as Prisma.InputJsonValue,
+          tokensEntrada: usage.input_tokens,
+          tokensSaida: usage.output_tokens,
           concluidoEm: new Date(),
           // Limpa uma mensagemErro deixada por um sweep de travadas anterior
           // (falso positivo) — senão uma execução saudável e concluída fica
