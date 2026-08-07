@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import type { CorePilotState } from '../../initialState';
 import type { CorePilotActions } from '../../useCorePilotState';
@@ -56,6 +57,22 @@ export function Step5Orchestrator({ state, actions }: { state: CorePilotState; a
     if (!selecionada) return;
     void actions.atualizarEtapaOrquestradorReal(selecionada.id, patch);
   };
+
+  // Nome e prazo são digitados livremente — salvar em cada tecla (como o
+  // resto dos campos, que são seleções discretas) faz PATCHs concorrentes
+  // chegarem fora de ordem e o valor exibido regredir/perder caractere no
+  // meio da digitação. Buffer local + salva só no blur, mesmo padrão já
+  // usado em step4/Instructions.tsx (updateInstructions/salvarInstrucoesReal).
+  const [nomeDraft, setNomeDraft] = useState(selecionada?.nome ?? '');
+  const [prazoDraft, setPrazoDraft] = useState(String(selecionada?.prazoDias ?? 0));
+  // Depende só de selecionada?.id de propósito (oxlint acusa falta de
+  // selecionada.nome/prazoDias no array de deps, mas incluí-los reintroduziria
+  // o bug: o efeito resetaria o rascunho a cada patch salvo no blur, por
+  // cima do que o usuário estiver digitando).
+  useEffect(() => {
+    setNomeDraft(selecionada?.nome ?? '');
+    setPrazoDraft(String(selecionada?.prazoDias ?? 0));
+  }, [selecionada?.id]);
 
   return (
     <div style={{ ...card, padding: 28 }}>
@@ -179,7 +196,13 @@ export function Step5Orchestrator({ state, actions }: { state: CorePilotState; a
             </div>
 
             <label style={{ fontSize: 11.5, fontWeight: 700, color: colors.textMuted, display: 'block', marginBottom: 5 }}>Nome da etapa</label>
-            <input type="text" value={selecionada.nome} onChange={(e: ChangeEvent<HTMLInputElement>) => atualizarSelecionada({ nome: e.target.value })} style={{ ...inputSm, width: '100%', marginBottom: 14 }} />
+            <input
+              type="text"
+              value={nomeDraft}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setNomeDraft(e.target.value)}
+              onBlur={() => { if (nomeDraft !== selecionada.nome) atualizarSelecionada({ nome: nomeDraft }); }}
+              style={{ ...inputSm, width: '100%', marginBottom: 14 }}
+            />
 
             <label style={{ fontSize: 11.5, fontWeight: 700, color: colors.textMuted, display: 'block', marginBottom: 5 }}>Tipo de etapa</label>
             <select
@@ -214,7 +237,18 @@ export function Step5Orchestrator({ state, actions }: { state: CorePilotState; a
               </div>
               <div>
                 <label style={{ fontSize: 11.5, fontWeight: 700, color: colors.textMuted, display: 'block', marginBottom: 5 }}>Prazo (dias)</label>
-                <input type="number" min={0} value={selecionada.prazoDias ?? 0} onChange={(e) => atualizarSelecionada({ prazoDias: parseInt(e.target.value, 10) || 0 })} style={{ ...inputSm, width: '100%' }} />
+                <input
+                  type="number"
+                  min={0}
+                  value={prazoDraft}
+                  onChange={(e) => setPrazoDraft(e.target.value)}
+                  onBlur={() => {
+                    const novoPrazo = parseInt(prazoDraft, 10) || 0;
+                    setPrazoDraft(String(novoPrazo));
+                    if (novoPrazo !== (selecionada.prazoDias ?? 0)) atualizarSelecionada({ prazoDias: novoPrazo });
+                  }}
+                  style={{ ...inputSm, width: '100%' }}
+                />
               </div>
             </div>
 
