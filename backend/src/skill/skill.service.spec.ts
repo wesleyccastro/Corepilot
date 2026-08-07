@@ -99,7 +99,7 @@ describe('SkillService', () => {
     ).rejects.toThrow(NotFoundException);
     expect(prisma.skill.findFirst).toHaveBeenCalledWith({
       where: { id: 'skill-x', agente: { empresaId: 'empresa-1' } },
-      include: { agente: true, ferramentas: true },
+      include: { agente: { include: { modulo: true } }, ferramentas: true },
     });
   });
 
@@ -132,7 +132,7 @@ describe('SkillService', () => {
 
     expect(prisma.skill.findFirst).toHaveBeenCalledWith({
       where: { id: 'skill-1', agente: { empresaId: 'empresa-1' } },
-      include: { agente: true, ferramentas: true },
+      include: { agente: { include: { modulo: true } }, ferramentas: true },
     });
     expect(prisma.skill.update).toHaveBeenCalledWith({
       where: { id: 'skill-1' },

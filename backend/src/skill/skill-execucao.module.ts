@@ -4,10 +4,10 @@ import { SkillExecucaoService } from './skill-execucao.service';
 import { AuthModule } from '../auth/auth.module';
 import { AuditModule } from '../audit/audit.module';
 import { SkillModule } from './skill.module';
-import { ChatModule } from '../chat/chat.module';
+import { SkillExecutorModule } from './skill-executor.module';
 
 @Module({
-  imports: [AuthModule, AuditModule, SkillModule, ChatModule],
+  imports: [AuthModule, AuditModule, SkillModule, SkillExecutorModule],
   controllers: [SkillExecucaoController],
   providers: [SkillExecucaoService],
 })
