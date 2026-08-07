@@ -118,6 +118,56 @@ git add src/corepilot/lucideIcons.ts
 git commit -m "feat(frontend): catálogo de ícones lucide-react e resolveModuleIcon"
 ```
 
+**Bug real encontrado na checagem visual manual (Task 7) e corrigido aqui:** o filtro só por
+nome (Step 1 acima) deixava passar `useLucideContext` — um hook novo do barrel do
+`lucide-react` v1.x que não existia na v0.487.0 usada como referência original, e que não bate
+com nenhuma das exclusões por nome (não é `icons`/`createLucideIcon`/`Icon`, não começa com
+`Lucide`, não termina em `Icon`). O `IconPicker` tentava renderizar esse hook como se fosse um
+componente de ícone; como o hook retorna o valor de contexto (um objeto, não JSX), React
+quebrava com "Objects are not valid as a React child (found: object with keys {})" assim que o
+popover abria (a lista inteira, sem filtro de busca, é renderizada de cara). Fix: filtrar
+também por **tipo real do export**, não só por nome — só aceitar valores que são
+`React.forwardRef` de verdade (`valor.$$typeof === Symbol.for('react.forward_ref')`), tanto em
+`allLucideIcons` quanto em `resolveModuleIcon`. Código final de `lucideIcons.ts`:
+
+```ts
+import * as LucideIcons from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
+const EXPORTS_NAO_ICONES = new Set(['icons', 'createLucideIcon', 'Icon']);
+
+function isIconComponent(valor: unknown): valor is LucideIcon {
+  return (
+    typeof valor === 'object' &&
+    valor !== null &&
+    (valor as { $$typeof?: symbol }).$$typeof === Symbol.for('react.forward_ref')
+  );
+}
+
+export const allLucideIcons: { nome: string; Icone: LucideIcon }[] = Object.entries(LucideIcons)
+  .filter(
+    ([nome, valor]) =>
+      !EXPORTS_NAO_ICONES.has(nome) && !nome.startsWith('Lucide') && !nome.endsWith('Icon') && isIconComponent(valor),
+  )
+  .map(([nome, Icone]) => ({ nome, Icone: Icone as LucideIcon }))
+  .sort((a, b) => a.nome.localeCompare(b.nome));
+
+const ALIAS_LEGADO: Record<string, string> = {
+  leaf: 'Leaf',
+  cart: 'ShoppingCart',
+  wallet: 'Wallet',
+  wrench: 'Wrench',
+  users: 'Users',
+};
+
+export function resolveModuleIcon(nome: string | null | undefined): LucideIcon {
+  if (!nome) return LucideIcons.Layers;
+  const nomeResolvido = ALIAS_LEGADO[nome] ?? nome;
+  const candidato = (LucideIcons as unknown as Record<string, unknown>)[nomeResolvido];
+  return isIconComponent(candidato) ? candidato : LucideIcons.Layers;
+}
+```
+
 ---
 
 ### Task 3: Componente `IconPicker`
