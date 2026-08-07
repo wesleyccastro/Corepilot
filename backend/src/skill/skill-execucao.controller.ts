@@ -7,7 +7,6 @@ import {
   UnprocessableEntityException,
   UseGuards,
 } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TenantGuard } from '../auth/tenant.guard';
 import { TenantContext } from '../auth/tenant-context';
@@ -42,10 +41,7 @@ export class SkillExecucaoController {
     @Body() body: ExecutarSkillDto,
   ) {
     const { usuarioId, empresaId } = this.tenantContext.get();
-    const skill = await this.skillService.findByIdInEmpresa(
-      skillId,
-      empresaId,
-    );
+    const skill = await this.skillService.findByIdInEmpresa(skillId, empresaId);
 
     const { output, usage } = await this.skillExecutorService.executar({
       agente: skill.agente,
@@ -68,7 +64,7 @@ export class SkillExecucaoController {
       skillId,
       usuarioId,
       body.entrada,
-      output as Prisma.InputJsonValue,
+      output,
       usage.input_tokens,
       usage.output_tokens,
     );

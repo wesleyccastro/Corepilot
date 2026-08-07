@@ -189,6 +189,53 @@ describe('SkillExecutorService', () => {
     });
   });
 
+  it('termina o histórico com uma mensagem user antes de chamar parseStructuredFromHistory (evita prefill assistant rejeitado pela API)', async () => {
+    const { anthropicService, prisma } = buildDeps();
+    (anthropicService.createWithTools as jest.Mock)
+      .mockResolvedValueOnce({
+        stop_reason: 'tool_use',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'call-1',
+            name: 'consulta_consulta-1',
+            input: { codProduto: 'X1' },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        stop_reason: 'end_turn',
+        content: [{ type: 'text', text: 'ok' }],
+      });
+    (
+      anthropicService.parseStructuredFromHistory as jest.Mock
+    ).mockResolvedValue({
+      parsed_output: { titulo: 'ok' },
+      usage: { input_tokens: 30, output_tokens: 10 },
+    });
+    (prisma.consultaResultado.findMany as jest.Mock).mockResolvedValue([
+      { dados: { codProduto: 'X1', saldo: 42 } },
+    ]);
+    const service = new SkillExecutorService(anthropicService, prisma);
+
+    await service.executar({
+      agente: agenteBase,
+      modulo: moduloSemInstrucoes,
+      skill: {
+        ...skillSemFerramentas,
+        ferramentas: [
+          { id: 'consulta-1', nome: 'Saldo de estoque', camposFiltro: [] },
+        ],
+      },
+      entrada: 'Qual o saldo do produto X1?',
+    });
+
+    const mensagensEnviadas = (
+      anthropicService.parseStructuredFromHistory as jest.Mock
+    ).mock.calls[0][0].messages as { role: string }[];
+    expect(mensagensEnviadas[mensagensEnviadas.length - 1].role).toBe('user');
+  });
+
   it('esgota as iterações do loop e ainda assim retorna a saída final via parseStructuredFromHistory', async () => {
     const { anthropicService, prisma } = buildDeps();
     (anthropicService.createWithTools as jest.Mock).mockResolvedValue({
@@ -224,9 +271,9 @@ describe('SkillExecutorService', () => {
     });
 
     expect(anthropicService.createWithTools).toHaveBeenCalledTimes(5);
-    expect(
-      anthropicService.parseStructuredFromHistory,
-    ).toHaveBeenCalledTimes(1);
+    expect(anthropicService.parseStructuredFromHistory).toHaveBeenCalledTimes(
+      1,
+    );
     expect(resultado.output).toEqual({ titulo: 'parcial' });
   });
 });

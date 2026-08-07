@@ -77,9 +77,7 @@ export class SkillExecutorService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async executar(
-    params: ExecutarSkillParams,
-  ): Promise<ExecutarSkillResultado> {
+  async executar(params: ExecutarSkillParams): Promise<ExecutarSkillResultado> {
     const { agente, modulo, skill, entrada } = params;
     const schema = construirSchemaSaida(skill.camposSaida);
     const system = montarSystemPrompt(agente, modulo, skill);
@@ -157,6 +155,15 @@ export class SkillExecutorService {
 
       mensagens = [...mensagens, { role: 'user', content: resultadosDeTool }];
     }
+
+    mensagens = [
+      ...mensagens,
+      {
+        role: 'user',
+        content:
+          'Com base em tudo acima, produza a saída final no formato solicitado.',
+      },
+    ];
 
     return this.anthropicService.parseStructuredFromHistory({
       system,

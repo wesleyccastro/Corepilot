@@ -68,7 +68,11 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
       skill: {
         objetivo: 'Agrupar itens por família',
         camposSaida: [{ nome: 'grupos', tipo: 'string[]', obrigatorio: true }],
-        ferramentas: [] as { id: string; nome: string; camposFiltro: unknown }[],
+        ferramentas: [] as {
+          id: string;
+          nome: string;
+          camposFiltro: unknown;
+        }[],
       },
     },
   };
@@ -166,6 +170,19 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
           ferramentas: [
             { id: 'consulta-1', nome: 'Estoque', camposFiltro: [] },
           ],
+        }),
+      }),
+    );
+    expect(prisma.execucaoDeEtapa.findMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        include: expect.objectContaining({
+          etapa: {
+            include: {
+              agente: { include: { modulo: true } },
+              skill: { include: { ferramentas: true } },
+            },
+          },
         }),
       }),
     );
