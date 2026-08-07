@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useCorePilotState } from './useCorePilotState';
 import { useMe } from './useMe';
 import { Header } from './components/Header';
@@ -13,10 +14,20 @@ import { AdminSettings } from './views/admin/AdminSettings';
 import { AdminCompany } from './views/admin/AdminCompany';
 import { AdminModulos } from './views/admin/AdminModulos';
 
-export function CorePilotApp({ accessToken }: { accessToken: string }) {
+interface CorePilotAppProps {
+  accessToken: string;
+  abrirWizardAoEntrar?: boolean;
+}
+
+export function CorePilotApp({ accessToken, abrirWizardAoEntrar }: CorePilotAppProps) {
   const { state, actions, refs } = useCorePilotState(accessToken);
   const { me, refetch: refetchMe } = useMe(accessToken);
   const activeModule = state.publishedModules.find((m) => state.view === `module:${m.id}`);
+
+  useEffect(() => {
+    if (abrirWizardAoEntrar) actions.viewWizardNew();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div style={{ height: '100vh', background: '#F7F8F6', color: '#1F2A2E', position: 'relative', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

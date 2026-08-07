@@ -18,7 +18,10 @@ export function Overview({ state, actions, scrollRef, me }: OverviewProps) {
   // Empresas criadas pelo cadastro (signup) sempre têm cnpjCpf; as empresas
   // de demonstração/seed, criadas antes desse campo existir, não têm. Uma
   // empresa real não deve ver as perguntas de exemplo — elas não têm
-  // nenhuma relação com o que essa empresa realmente fez.
+  // nenhuma relação com o que essa empresa realmente fez. Antes de `/me`
+  // responder, `me` é null — trata como "ainda não sei" pra não piscar o
+  // mock na tela e sumir logo em seguida.
+  const empresaCarregada = me !== null;
   const isEmpresaReal = Boolean(me?.empresa.cnpjCpf);
   const temModulos = state.publishedModules.length > 0;
 
@@ -36,11 +39,11 @@ export function Overview({ state, actions, scrollRef, me }: OverviewProps) {
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', maxWidth: 1080 }}>
         <h1 style={{ fontSize: 26, fontWeight: 800, color: colors.navy, margin: '0 0 6px', flexShrink: 0 }}>Visão Geral</h1>
         <p style={{ fontSize: 14.5, color: colors.textMuted, margin: '0 0 20px', flexShrink: 0 }}>
-          {isEmpresaReal ? (me?.empresa.nome ?? '') : 'Grupo LFG Agro · atualizado há 8 minutos'}
+          {!empresaCarregada ? ' ' : isEmpresaReal ? (me?.empresa.nome ?? '') : 'Grupo LFG Agro · atualizado há 8 minutos'}
         </p>
 
         <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', paddingRight: 4 }}>
-          {isEmpresaReal ? (
+          {!empresaCarregada ? null : isEmpresaReal ? (
             !temModulos && (
               <div style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 12, padding: '28px 24px', textAlign: 'center', marginBottom: 20 }}>
                 <div style={{ fontSize: 14.5, fontWeight: 700, color: colors.navy, marginBottom: 6 }}>Você ainda não tem módulos criados</div>

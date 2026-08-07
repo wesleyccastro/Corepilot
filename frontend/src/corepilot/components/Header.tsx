@@ -20,17 +20,19 @@ function iniciais(nome: string): string {
 export function Header({ state, actions, me }: HeaderProps) {
   // Empresas criadas pelo cadastro (signup) sempre têm cnpjCpf; as empresas
   // de demonstração/seed, criadas antes desse campo existir, não têm. Uma
-  // empresa real não deve ver as abas de exemplo Compras/Financeiro.
-  const isEmpresaReal = Boolean(me?.empresa.cnpjCpf);
+  // empresa real não deve ver as abas de exemplo Compras/Financeiro. Antes
+  // de `/me` responder, `me` é null — trata como "ainda não sei", não como
+  // "é a empresa seed", senão o mock pisca na tela antes de sumir.
+  const mostrarAbasDeExemplo = me !== null && !me.empresa.cnpjCpf;
   const navTabs = [
     { id: 'overview' as const, label: 'Visão Geral' },
-    ...(isEmpresaReal ? [] : [
+    ...(mostrarAbasDeExemplo ? [
       { id: 'compras' as const, label: 'Compras' },
       { id: 'financeiro' as const, label: 'Financeiro' },
-    ]),
+    ] : []),
     ...state.publishedModules.map((m) => ({ id: `module:${m.id}` as const, label: m.nome })),
   ];
-  const activeAgentsCount = (isEmpresaReal ? 0 : 2) + state.publishedModules.length;
+  const activeAgentsCount = (mostrarAbasDeExemplo ? 2 : 0) + state.publishedModules.length;
   const nomeEmpresa = me?.empresa.nome ?? '…';
   const nomeUsuario = me?.usuario.nome ?? '…';
 
