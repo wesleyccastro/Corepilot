@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- `lucide-react` versão `^0.487.0` (mesma faixa semver dos demais deps do `frontend/package.json` — sem pin exato).
+- `lucide-react` — sem pin de versão, segue a mesma convenção de faixa semver (`^`) dos demais deps do `frontend/package.json`. **Atualizado durante a execução (2026-08-07):** `npm install lucide-react` sem versão resolveu `^1.30.0` (a spec original citava `0.487.0`, do anexo de referência de outro projeto — biblioteca teve bump de major version desde então). Confirmado que a mesma lógica de filtro do catálogo (Task 2) funciona igual em `1.30.0` — só muda a extensão do entry point ESM instalado (`dist/esm/lucide-react.mjs`, não mais `.js`).
 - Sem mudança de schema Prisma nem de DTO/controller do backend: `Modulo.icone` já é `String?` livre.
 - Sem test runner no frontend — a verificação automatizada disponível em cada task é `npm run build` (`tsc -b && vite build`); lint (`npm run lint`, oxlint) roda como parte da verificação final (Task 7).
 - Seguir a spec em `docs/superpowers/specs/2026-08-07-icone-do-modulo-design.md` — qualquer divergência precisa ser justificada, não silenciosa.
@@ -102,13 +102,13 @@ Expected: compila sem erros de tipo.
 - [ ] **Step 3: Confirmar o tamanho do catálogo (checagem manual rápida)**
 
 Run: `cd frontend && node --input-type=module -e "
-import * as L from './node_modules/lucide-react/dist/esm/lucide-react.js';
+import * as L from './node_modules/lucide-react/dist/esm/lucide-react.mjs';
 const EXC = new Set(['icons','createLucideIcon','Icon']);
 const nomes = Object.keys(L).filter(n => !EXC.has(n) && !n.startsWith('Lucide') && !n.endsWith('Icon'));
 console.log('total:', nomes.length);
 console.log('tem Leaf?', nomes.includes('Leaf'), 'tem ShoppingCart?', nomes.includes('ShoppingCart'));
 "`
-Expected: `total: 1768` (ou próximo — pode variar ±alguns se a versão instalada divergir de 0.487.0), `tem Leaf? true tem ShoppingCart? true`. Esse script é só uma checagem manual pontual, não faz parte do código do produto — não precisa ser mantido.
+Expected (v1.30.0): `total: 2019`, `tem Leaf? true tem ShoppingCart? true`. Esse script é só uma checagem manual pontual, não faz parte do código do produto — não precisa ser mantido.
 
 - [ ] **Step 4: Commit**
 
@@ -328,6 +328,7 @@ git commit -m "feat(frontend): usa IconPicker no cadastro de identidade do módu
 Em `frontend/src/corepilot/components/Header.tsx:4`, logo abaixo da importação existente de ícones:
 
 ```tsx
+import type { LucideIcon } from 'lucide-react';
 import { BellIcon, BuildingIcon, ChevronDownIcon, GearIcon, LayersIcon, LogoutIcon, PlusIcon, SearchIcon, UsersIcon } from '../icons';
 import { resolveModuleIcon } from '../lucideIcons';
 ```
@@ -337,10 +338,12 @@ import { resolveModuleIcon } from '../lucideIcons';
 Logo depois do fechamento do array `navTabs` (depois da linha `];` em `frontend/src/corepilot/components/Header.tsx:34`), adicionar:
 
 ```tsx
-  const iconePorTab = new Map(
-    state.publishedModules.map((m) => [`module:${m.id}`, resolveModuleIcon(m.icone)] as const),
+  const iconePorTab = new Map<string, LucideIcon>(
+    state.publishedModules.map((m) => [`module:${m.id}`, resolveModuleIcon(m.icone)]),
   );
 ```
+
+**Nota (confirmado na execução):** a anotação explícita `Map<string, LucideIcon>` é necessária — sem ela, TS infere a chave do Map como o tipo literal `` `module:${string}` `` (só a partir dos pares realmente inseridos), e `tab.id` (que também pode ser `'overview'`/`'compras'`/`'financeiro'`) não é atribuível a esse tipo mais estreito no `.get()` do Step 3 abaixo.
 
 (Só as abas de módulo publicado têm ícone — "Visão Geral"/"Compras"/"Financeiro" continuam sem ícone, são abas fixas do app, não `Modulo.icone`.)
 

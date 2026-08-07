@@ -1,7 +1,9 @@
 import type { CorePilotState } from '../initialState';
 import type { CorePilotActions } from '../useCorePilotState';
 import type { MeResponse } from '../useMe';
+import type { LucideIcon } from 'lucide-react';
 import { BellIcon, BuildingIcon, ChevronDownIcon, GearIcon, LayersIcon, LogoutIcon, PlusIcon, SearchIcon, UsersIcon } from '../icons';
+import { resolveModuleIcon } from '../lucideIcons';
 import { colors, overlayFixed } from '../styles';
 import { supabase } from '../../lib/supabase/client';
 import logo from '../../assets/logo.png';
@@ -32,6 +34,9 @@ export function Header({ state, actions, me }: HeaderProps) {
     ] : []),
     ...state.publishedModules.map((m) => ({ id: `module:${m.id}` as const, label: m.nome })),
   ];
+  const iconePorTab = new Map<string, LucideIcon>(
+    state.publishedModules.map((m) => [`module:${m.id}`, resolveModuleIcon(m.icone)]),
+  );
   const activeAgentsCount = (mostrarAbasDeExemplo ? 2 : 0) + state.publishedModules.length;
   const nomeEmpresa = me?.empresa.nome ?? '…';
   const nomeUsuario = me?.usuario.nome ?? '…';
@@ -104,8 +109,10 @@ export function Header({ state, actions, me }: HeaderProps) {
       <div style={{ background: '#fff', borderBottom: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', gap: 4, padding: '0 24px' }}>
         {navTabs.map((tab) => {
           const active = tab.id === state.view;
+          const IconeTab = iconePorTab.get(tab.id);
           return (
-            <div key={tab.id} onClick={() => actions.setView(tab.id)} style={{ padding: '14px 16px', cursor: 'pointer', position: 'relative' }}>
+            <div key={tab.id} onClick={() => actions.setView(tab.id)} style={{ padding: '14px 16px', cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center', gap: 6 }}>
+              {IconeTab && <IconeTab size={14} color={active ? colors.navy : colors.textMuted} />}
               <span style={{ fontSize: 14, fontWeight: active ? 700 : 500, color: active ? colors.navy : colors.textMuted }}>{tab.label}</span>
               {active && <div style={{ position: 'absolute', left: 0, right: 0, bottom: -1, height: 2, background: colors.teal }} />}
             </div>
