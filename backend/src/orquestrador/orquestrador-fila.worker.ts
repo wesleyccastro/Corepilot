@@ -337,7 +337,7 @@ export class OrquestradorFilaWorker implements OnApplicationBootstrap {
         where: { id: execucao.id },
         data: {
           status: 'done',
-          output: output as Prisma.InputJsonValue,
+          output: output,
           tokensEntrada: usage.input_tokens,
           tokensSaida: usage.output_tokens,
           concluidoEm: new Date(),

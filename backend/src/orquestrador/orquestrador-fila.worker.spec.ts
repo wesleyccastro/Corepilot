@@ -419,6 +419,11 @@ describe('OrquestradorFilaWorker — processarFilaAgentes', () => {
       evolutionApi,
       config,
     } = buildDeps();
+    // @nestjs/schedule chama este método via setInterval puro, sem .catch();
+    // se esta rejeição escapasse, seria uma unhandled rejection derrubando a
+    // API inteira a cada 5s. O try/catch por execução dentro do for não
+    // protege esta falha porque ela acontece ANTES do loop, dentro do
+    // recuperarExecucoesTravadas.
     (prisma.execucaoDeEtapa.findMany as jest.Mock).mockRejectedValueOnce(
       new Error('Supabase indisponível'),
     );
