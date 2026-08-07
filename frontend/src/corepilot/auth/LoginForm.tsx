@@ -1,13 +1,10 @@
-import { useState, type CSSProperties, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { supabase, setRememberSession } from '../../lib/supabase/client';
 import { colors } from '../styles';
 import { AlertCircleIcon, CheckCircleIcon, EyeIcon, EyeOffIcon, SpinnerIcon } from '../icons';
+import { AuthHeroPanel } from './AuthHeroPanel';
+import { fieldInputStyle, fieldLabelStyle } from './authStyles';
 import logo from '../../assets/logo.png';
-import logoIcon from '../../assets/logo-icon.png';
-import heroBg from '../../assets/hero-bg.png';
-
-const fieldLabelStyle: CSSProperties = { fontSize: 12.5, fontWeight: 700, color: colors.textBody, display: 'block', marginBottom: 6 };
-const fieldInputStyle: CSSProperties = { width: '100%', border: `1px solid ${colors.border}`, borderRadius: 9, padding: '12px 14px', fontSize: 13.5, background: '#fff', color: colors.text };
 
 function invalidCredentialsMessage(message: string): string {
   return /invalid login credentials/i.test(message)
@@ -15,7 +12,11 @@ function invalidCredentialsMessage(message: string): string {
     : message;
 }
 
-export function LoginForm() {
+interface LoginFormProps {
+  onCriarConta: () => void;
+}
+
+export function LoginForm({ onCriarConta }: LoginFormProps) {
   const [mode, setMode] = useState<'login' | 'forgot'>('login');
 
   const [email, setEmail] = useState('');
@@ -178,6 +179,19 @@ export function LoginForm() {
               <p style={{ textAlign: 'center', fontSize: 12.5, color: colors.textFaint, marginTop: 28 }}>
                 Não tem acesso? <a href="#" style={{ fontWeight: 700, textDecoration: 'none' }}>Fale com o administrador</a>
               </p>
+              <p style={{ textAlign: 'center', fontSize: 12.5, color: colors.textFaint, marginTop: 8 }}>
+                Primeira vez aqui?{' '}
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onCriarConta();
+                  }}
+                  style={{ fontWeight: 700, textDecoration: 'none' }}
+                >
+                  Criar uma conta
+                </a>
+              </p>
             </>
           ) : (
             <>
@@ -244,21 +258,7 @@ export function LoginForm() {
         </div>
       </div>
 
-      <div style={{ flex: 1, background: colors.navy, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 60, position: 'relative', overflow: 'hidden' }}>
-        <img src={heroBg} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 15%' }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(7,54,74,.35) 0%, rgba(7,54,74,.55) 55%, rgba(7,54,74,.92) 100%)' }} />
-        <img
-          src={logoIcon}
-          alt=""
-          style={{ position: 'relative', height: 120, width: 'auto', marginBottom: 28, filter: 'drop-shadow(0 12px 30px rgba(0,0,0,.3))' }}
-        />
-        <h2 style={{ position: 'relative', color: '#fff', fontSize: 24, fontWeight: 800, margin: '0 0 12px', textAlign: 'center', maxWidth: 380 }}>
-          Sua empresa ganhando super poderes com IA acoplada aos principais processos.
-        </h2>
-        <p style={{ position: 'relative', color: 'rgba(255,255,255,.8)', fontSize: 14, textAlign: 'center', maxWidth: 360, lineHeight: 1.6, margin: 0 }}>
-          Agentes de IA conectados aos dados e processos da sua empresa — do jeito que cada equipe precisa.
-        </p>
-      </div>
+      <AuthHeroPanel />
     </div>
   );
 }

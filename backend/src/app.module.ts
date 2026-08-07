@@ -18,6 +18,7 @@ import { SyncCronModule } from './consulta/sync-cron.module';
 import { FerramentaModule } from './skill/ferramenta.module';
 import { OrquestradorModule } from './orquestrador/orquestrador.module';
 import { IntegracaoWhatsAppModule } from './integracao-whatsapp/integracao-whatsapp.module';
+import { CadastroEmpresaModule } from './cadastro-empresa/cadastro-empresa.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { IntegracaoWhatsAppModule } from './integracao-whatsapp/integracao-whats
     FerramentaModule,
     OrquestradorModule,
     IntegracaoWhatsAppModule,
+    CadastroEmpresaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

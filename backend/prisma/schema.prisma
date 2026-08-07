@@ -11,6 +11,11 @@ model Empresa {
   id              String   @id @default(uuid())
   nome            String
   razaoSocial     String?
+  cnpjCpf         String?  @unique
+  segmento        String?
+  uf              String?
+  cidade          String?
+  whatsapp        String?
   logoData        Bytes?
   logoContentType String?
   criadoEm        DateTime @default(now())
