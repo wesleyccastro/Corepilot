@@ -79,7 +79,7 @@ export function AgentSkillEditorTab({ state, actions }: { state: CorePilotState;
 
         {state.wizardError && <div style={{ color: colors.danger, fontSize: 12.5 }}>{state.wizardError}</div>}
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => void actions.salvarSkillReal()} disabled={state.wizardSaving || !state.skillFormNome.trim()} style={btnDark}>
+          <button onClick={() => void actions.salvarSkillReal()} disabled={state.wizardSaving || !state.skillFormNome.trim() || !state.skillFormObjetivo.trim()} style={btnDark}>
             {state.wizardSaving ? 'Salvando…' : 'Salvar skill'}
           </button>
           <button onClick={actions.cancelarEdicaoSkill} style={btnSecondary}>Cancelar</button>
