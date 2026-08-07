@@ -14,6 +14,7 @@ export interface EmpresaResumo {
   id: string;
   nome: string;
   razaoSocial: string | null;
+  cnpjCpf: string | null;
   logoDataUrl: string | null;
 }
 
@@ -25,6 +26,7 @@ export class EmpresaService {
     id: string;
     nome: string;
     razaoSocial: string | null;
+    cnpjCpf: string | null;
     logoData: Uint8Array | null;
     logoContentType: string | null;
   }): EmpresaResumo {
@@ -32,6 +34,7 @@ export class EmpresaService {
       id: empresa.id,
       nome: empresa.nome,
       razaoSocial: empresa.razaoSocial,
+      cnpjCpf: empresa.cnpjCpf,
       logoDataUrl:
         empresa.logoData && empresa.logoContentType
           ? `data:${empresa.logoContentType};base64,${Buffer.from(empresa.logoData).toString('base64')}`

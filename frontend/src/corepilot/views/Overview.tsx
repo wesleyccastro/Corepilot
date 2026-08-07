@@ -15,6 +15,13 @@ interface OverviewProps {
 }
 
 export function Overview({ state, actions, scrollRef, me }: OverviewProps) {
+  // Empresas criadas pelo cadastro (signup) sempre têm cnpjCpf; as empresas
+  // de demonstração/seed, criadas antes desse campo existir, não têm. Uma
+  // empresa real não deve ver as perguntas de exemplo — elas não têm
+  // nenhuma relação com o que essa empresa realmente fez.
+  const isEmpresaReal = Boolean(me?.empresa.cnpjCpf);
+  const temModulos = state.publishedModules.length > 0;
+
   return (
     <div style={{ padding: '24px 24px 20px', height: '100%', display: 'flex', gap: 24 }}>
       <div style={{ width: 260, flexShrink: 0 }}>
@@ -28,22 +35,44 @@ export function Overview({ state, actions, scrollRef, me }: OverviewProps) {
       </div>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', maxWidth: 1080 }}>
         <h1 style={{ fontSize: 26, fontWeight: 800, color: colors.navy, margin: '0 0 6px', flexShrink: 0 }}>Visão Geral</h1>
-        <p style={{ fontSize: 14.5, color: colors.textMuted, margin: '0 0 20px', flexShrink: 0 }}>Grupo LFG Agro · atualizado há 8 minutos</p>
+        <p style={{ fontSize: 14.5, color: colors.textMuted, margin: '0 0 20px', flexShrink: 0 }}>
+          {isEmpresaReal ? (me?.empresa.nome ?? '') : 'Grupo LFG Agro · atualizado há 8 minutos'}
+        </p>
 
         <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', paddingRight: 4 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: colors.navy, margin: '0 0 12px' }}>Perguntas recentes aos módulos</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
-            {overviewQnA.map((qa, i) => (
-              <div key={i} style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 12, padding: '18px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                  <span style={{ background: qa.tagBg, color: qa.tagColor, borderRadius: 20, padding: '3px 10px', fontSize: 11.5, fontWeight: 700 }}>{qa.module}</span>
-                  <span style={{ fontSize: 11.5, color: colors.textFaint }}>{qa.agent}</span>
-                </div>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: colors.text, marginBottom: 8 }}>{qa.question}</div>
-                <div style={{ fontSize: 13, color: colors.textMuted, lineHeight: 1.5 }}>{qa.answer}</div>
+          {isEmpresaReal ? (
+            !temModulos && (
+              <div style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 12, padding: '28px 24px', textAlign: 'center', marginBottom: 20 }}>
+                <div style={{ fontSize: 14.5, fontWeight: 700, color: colors.navy, marginBottom: 6 }}>Você ainda não tem módulos criados</div>
+                <p style={{ fontSize: 13, color: colors.textMuted, margin: '0 0 16px' }}>
+                  Crie seu primeiro módulo para começar a configurar agentes de IA para a sua empresa.
+                </p>
+                <button
+                  type="button"
+                  onClick={actions.viewWizardNew}
+                  style={{ background: colors.teal, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  + Criar módulo
+                </button>
               </div>
-            ))}
-          </div>
+            )
+          ) : (
+            <>
+              <div style={{ fontSize: 15, fontWeight: 700, color: colors.navy, margin: '0 0 12px' }}>Perguntas recentes aos módulos</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
+                {overviewQnA.map((qa, i) => (
+                  <div key={i} style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 12, padding: '18px 20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                      <span style={{ background: qa.tagBg, color: qa.tagColor, borderRadius: 20, padding: '3px 10px', fontSize: 11.5, fontWeight: 700 }}>{qa.module}</span>
+                      <span style={{ fontSize: 11.5, color: colors.textFaint }}>{qa.agent}</span>
+                    </div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: colors.text, marginBottom: 8 }}>{qa.question}</div>
+                    <div style={{ fontSize: 13, color: colors.textMuted, lineHeight: 1.5 }}>{qa.answer}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
 
           {state.overviewThread.map((msg) => (
             <MessageBubble key={msg.id} msg={msg} agentLabel="CorePilot" />

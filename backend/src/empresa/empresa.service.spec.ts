@@ -21,6 +21,7 @@ describe('EmpresaService', () => {
       id: 'empresa-1',
       nome: 'Empresa A',
       razaoSocial: 'Empresa A Ltda',
+      cnpjCpf: '11222333000181',
       logoData: Buffer.from('abc'),
       logoContentType: 'image/png',
     });
@@ -29,6 +30,7 @@ describe('EmpresaService', () => {
       id: 'empresa-1',
       nome: 'Empresa A',
       razaoSocial: 'Empresa A Ltda',
+      cnpjCpf: '11222333000181',
       logoDataUrl: `data:image/png;base64,${Buffer.from('abc').toString('base64')}`,
     });
   });
@@ -40,6 +42,7 @@ describe('EmpresaService', () => {
       id: 'empresa-1',
       nome: 'Empresa A',
       razaoSocial: null,
+      cnpjCpf: null,
       logoData: null,
       logoContentType: null,
     });

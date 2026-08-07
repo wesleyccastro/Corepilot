@@ -31,6 +31,7 @@ interface EmpresaCriada {
   id: string;
   nome: string;
   razaoSocial: string;
+  cnpjCpf: string;
   logoData: null;
   logoContentType: null;
 }
@@ -43,6 +44,7 @@ describe('CadastroEmpresaService', () => {
         id: 'empresa-1',
         nome: DTO_VALIDO.razaoSocial,
         razaoSocial: DTO_VALIDO.razaoSocial,
+        cnpjCpf: '11222333000181',
         logoData: null,
         logoContentType: null,
       });

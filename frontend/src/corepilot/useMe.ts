@@ -3,7 +3,7 @@ import { apiFetch } from './api/apiFetch';
 
 export interface MeResponse {
   usuario: { id: string; nome: string; email: string };
-  empresa: { id: string; nome: string; razaoSocial: string | null; logoDataUrl: string | null };
+  empresa: { id: string; nome: string; razaoSocial: string | null; cnpjCpf: string | null; logoDataUrl: string | null };
   perfil: string;
 }
 
