@@ -2,6 +2,8 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -17,10 +19,11 @@ import { TenantGuard } from '../auth/tenant.guard';
 import { TenantContext } from '../auth/tenant-context';
 import { AuditService } from '../audit/audit.service';
 import { AnthropicService } from '../chat/anthropic.service';
-import { ModuloService } from './modulo.service';
+import { ModuloService, FRASE_CONFIRMACAO_EXCLUSAO_MODULO } from './modulo.service';
 import type { CreateModuloDto } from './dto/create-modulo.dto';
 import type { UpdateModuloDto } from './dto/update-modulo.dto';
 import type { RascunharInstrucoesDto } from './dto/rascunhar-instrucoes.dto';
+import type { ExcluirModuloDto } from './dto/excluir-modulo.dto';
 
 const RASCUNHO_INSTRUCOES_SCHEMA = z.object({ instrucoes: z.string() });
 
@@ -61,6 +64,34 @@ export class ModuloController {
       dadosDepois: body as unknown as Prisma.InputJsonValue,
     });
     return resultado;
+  }
+
+  @Delete(':id')
+  async excluir(@Param('id') id: string, @Body() body: ExcluirModuloDto) {
+    const { usuarioId, empresaId, perfil } = this.tenantContext.get();
+
+    if (perfil !== 'admin') {
+      throw new ForbiddenException(
+        'Somente administradores podem excluir módulos',
+      );
+    }
+
+    if (body.confirmacao !== FRASE_CONFIRMACAO_EXCLUSAO_MODULO) {
+      throw new BadRequestException(
+        `Digite exatamente "${FRASE_CONFIRMACAO_EXCLUSAO_MODULO}" para confirmar`,
+      );
+    }
+
+    const modulo = await this.moduloService.remover(id, empresaId);
+
+    await this.audit.record({
+      empresaId,
+      atorUsuarioId: usuarioId,
+      acao: 'modulo_excluido',
+      dadosAntes: { id: modulo.id, nome: modulo.nome, objetivo: modulo.objetivo },
+    });
+
+    return { ok: true };
   }
 
   @Post(':id/rascunho-instrucoes')

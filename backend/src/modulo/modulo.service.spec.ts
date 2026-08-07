@@ -10,6 +10,7 @@ describe('ModuloService', () => {
         findMany: jest.fn(),
         findFirst: jest.fn(),
         update: jest.fn(),
+        delete: jest.fn(),
       },
     } as unknown as PrismaService;
   }
@@ -165,5 +166,34 @@ describe('ModuloService', () => {
       service.update('modulo-x', 'empresa-1', { nome: 'X' }),
     ).rejects.toThrow(NotFoundException);
     expect(prisma.modulo.update).not.toHaveBeenCalled();
+  });
+
+  it('remover exclui o módulo escopado à empresa e retorna os dados dele', async () => {
+    const prisma = buildPrismaMock();
+    const modulo = { id: 'modulo-1', empresaId: 'empresa-1', nome: 'Compras' };
+    (prisma.modulo.findFirst as jest.Mock).mockResolvedValue(modulo);
+    (prisma.modulo.delete as jest.Mock).mockResolvedValue(modulo);
+    const service = new ModuloService(prisma);
+
+    const resultado = await service.remover('modulo-1', 'empresa-1');
+
+    expect(prisma.modulo.findFirst).toHaveBeenCalledWith({
+      where: { id: 'modulo-1', empresaId: 'empresa-1' },
+    });
+    expect(prisma.modulo.delete).toHaveBeenCalledWith({
+      where: { id: 'modulo-1' },
+    });
+    expect(resultado).toBe(modulo);
+  });
+
+  it('remover lança NotFoundException e não exclui nada se o módulo não existir na empresa', async () => {
+    const prisma = buildPrismaMock();
+    (prisma.modulo.findFirst as jest.Mock).mockResolvedValue(null);
+    const service = new ModuloService(prisma);
+
+    await expect(service.remover('modulo-x', 'empresa-1')).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(prisma.modulo.delete).not.toHaveBeenCalled();
   });
 });

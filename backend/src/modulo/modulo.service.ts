@@ -3,6 +3,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { CreateModuloDto } from './dto/create-modulo.dto';
 import type { UpdateModuloDto } from './dto/update-modulo.dto';
 
+/** Precisa bater exatamente com o que o usuário digita para confirmar a exclusão. */
+export const FRASE_CONFIRMACAO_EXCLUSAO_MODULO = 'Quero Excluir este módulo';
+
 @Injectable()
 export class ModuloService {
   constructor(private readonly prisma: PrismaService) {}
@@ -59,5 +62,17 @@ export class ModuloService {
         ativo: dto.ativo,
       },
     });
+  }
+
+  /**
+   * Exclusão definitiva. O schema tem `onDelete: Cascade` em toda a árvore
+   * que só existe por causa do módulo (conversas, agentes, skills,
+   * consultas, fluxo/orquestrador) — um único `delete` no Modulo já
+   * remove tudo isso no banco.
+   */
+  async remover(moduloId: string, empresaId: string) {
+    const modulo = await this.findByIdInEmpresa(moduloId, empresaId);
+    await this.prisma.modulo.delete({ where: { id: moduloId } });
+    return modulo;
   }
 }

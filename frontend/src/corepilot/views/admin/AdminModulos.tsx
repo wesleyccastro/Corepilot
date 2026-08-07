@@ -1,8 +1,12 @@
 import type { CorePilotState } from '../../initialState';
 import type { CorePilotActions } from '../../useCorePilotState';
+import type { MeResponse } from '../../useMe';
 import { colors } from '../../styles';
+import { ExcluirModuloDialog } from '../../components/ExcluirModuloDialog';
 
-export function AdminModulos({ state, actions }: { state: CorePilotState; actions: CorePilotActions }) {
+export function AdminModulos({ state, actions, me }: { state: CorePilotState; actions: CorePilotActions; me: MeResponse | null }) {
+  const isAdmin = me?.perfil === 'admin';
+
   return (
     <div style={{ maxWidth: 920, margin: '0 auto', padding: '28px 24px 90px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
@@ -62,9 +66,19 @@ export function AdminModulos({ state, actions }: { state: CorePilotState; action
                 Ativar
               </button>
             )}
+            {isAdmin && (
+              <button
+                onClick={() => actions.abrirExclusaoModulo(modulo)}
+                style={{ background: '#fff', border: `1px solid ${colors.danger}`, borderRadius: 7, padding: '7px 12px', fontSize: 12, fontWeight: 600, color: colors.danger, cursor: 'pointer' }}
+              >
+                Excluir
+              </button>
+            )}
           </div>
         ))}
       </div>
+
+      <ExcluirModuloDialog state={state} actions={actions} />
     </div>
   );
 }

@@ -31,7 +31,8 @@ import {
   rascunharCamposSaidaSkill,
 } from './agentes/api';
 import { atualizarFonteDeDados, criarFonteDeDados, listarFontesDeDados } from './fontes-de-dados/api';
-import { atualizarModulo, criarModulo, listarModulos, rascunharInstrucoesModulo } from './modulos/api';
+import { atualizarModulo, criarModulo, excluirModulo, listarModulos, rascunharInstrucoesModulo } from './modulos/api';
+import type { Modulo } from './modulos/types';
 import {
   atualizarSincronizacao,
   criarConsulta,
@@ -568,6 +569,31 @@ export function useCorePilotState(accessToken: string) {
       showToast(ativo ? 'Módulo ativado.' : 'Módulo desativado.');
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erro ao atualizar módulo');
+    }
+  };
+
+  const abrirExclusaoModulo = (modulo: Modulo) => update({ excluirModuloAlvo: modulo, excluirModuloTexto: '' });
+  const fecharExclusaoModulo = () => update({ excluirModuloAlvo: null, excluirModuloTexto: '', excluirModuloEnviando: false });
+  const updateExcluirModuloTexto = (e: ChangeEvent<HTMLInputElement>) => update({ excluirModuloTexto: e.target.value });
+
+  const confirmarExclusaoModulo = async () => {
+    const alvo = state.excluirModuloAlvo;
+    if (!alvo) return;
+
+    update({ excluirModuloEnviando: true });
+    try {
+      await excluirModulo(accessToken, alvo.id, state.excluirModuloTexto.trim());
+      update((s) => ({
+        todosModulos: s.todosModulos.filter((m) => m.id !== alvo.id),
+        publishedModules: s.publishedModules.filter((m) => m.id !== alvo.id),
+        excluirModuloAlvo: null,
+        excluirModuloTexto: '',
+        excluirModuloEnviando: false,
+      }));
+      showToast('Módulo excluído.');
+    } catch (err) {
+      update({ excluirModuloEnviando: false });
+      showToast(err instanceof Error ? err.message : 'Erro ao excluir módulo');
     }
   };
 
@@ -1590,6 +1616,7 @@ export function useCorePilotState(accessToken: string) {
     goAdminUsers, goAdminSettings, openGeneralSettings, openCompanySettings, backFromAdmin, setAdminTab,
     toggleUserMenu, closeUserMenu, openUsersFromMenu,
     abrirConfirmacao, fecharConfirmacao, confirmarAcaoPendente, goAdminModulos, alternarStatusModulo,
+    abrirExclusaoModulo, fecharExclusaoModulo, updateExcluirModuloTexto, confirmarExclusaoModulo,
     updateWaField, toggleWaExpanded, toggleChangeWaKey, updateWaNewKey, toggleWaNotifyTasks, setAdminSettingsTab,
     testWaConnection: salvarETestarWaConnection,
     toggleDsExpanded, toggleDsMenu, toggleQueriesSection, toggleSemanticSection, editConnectionFromMenu,

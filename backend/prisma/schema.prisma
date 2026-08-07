@@ -110,7 +110,7 @@ model Conversa {
   atualizadoEm DateTime @updatedAt
 
   empresa   Empresa      @relation(fields: [empresaId], references: [id])
-  modulo    Modulo       @relation(fields: [moduloId], references: [id])
+  modulo    Modulo       @relation(fields: [moduloId], references: [id], onDelete: Cascade)
   usuario   Usuario      @relation(fields: [usuarioId], references: [id])
   tag       ConversaTag? @relation(fields: [tagId], references: [id], onDelete: SetNull)
   mensagens Mensagem[]
@@ -124,7 +124,7 @@ model ConversaTag {
   criadoEm  DateTime @default(now())
 
   empresa   Empresa    @relation(fields: [empresaId], references: [id])
-  modulo    Modulo     @relation(fields: [moduloId], references: [id])
+  modulo    Modulo     @relation(fields: [moduloId], references: [id], onDelete: Cascade)
   conversas Conversa[]
 }
 
@@ -142,7 +142,7 @@ model Mensagem {
   tokensSaida   Int?
   criadoEm      DateTime      @default(now())
 
-  conversa Conversa @relation(fields: [conversaId], references: [id])
+  conversa Conversa @relation(fields: [conversaId], references: [id], onDelete: Cascade)
 }
 
 model Agente {
@@ -158,7 +158,7 @@ model Agente {
   criadoEm           DateTime @default(now())
 
   empresa Empresa @relation(fields: [empresaId], references: [id])
-  modulo  Modulo  @relation(fields: [moduloId], references: [id])
+  modulo  Modulo  @relation(fields: [moduloId], references: [id], onDelete: Cascade)
   skills  Skill[]
   etapas  Etapa[]
 }
@@ -171,7 +171,7 @@ model Skill {
   camposSaida Json
   criadoEm    DateTime @default(now())
 
-  agente      Agente                  @relation(fields: [agenteId], references: [id])
+  agente      Agente                  @relation(fields: [agenteId], references: [id], onDelete: Cascade)
   execucoes   SkillExecucao[]
   ferramentas ConsultaParametrizada[]
   etapas      Etapa[]
@@ -187,7 +187,7 @@ model SkillExecucao {
   tokensSaida   Int?
   criadoEm      DateTime @default(now())
 
-  skill   Skill   @relation(fields: [skillId], references: [id])
+  skill   Skill   @relation(fields: [skillId], references: [id], onDelete: Cascade)
   usuario Usuario @relation(fields: [usuarioId], references: [id])
 }
 
@@ -222,7 +222,7 @@ model ConsultaParametrizada {
   ultimoResultadoSincronizacao  Json?
   criadoEm                      DateTime  @default(now())
 
-  modulo       Modulo              @relation(fields: [moduloId], references: [id])
+  modulo       Modulo              @relation(fields: [moduloId], references: [id], onDelete: Cascade)
   fonteDeDados FonteDeDados        @relation(fields: [fonteDeDadosId], references: [id])
   resultados   ConsultaResultado[]
   skills       Skill[]
@@ -234,7 +234,7 @@ model ConsultaResultado {
   dados                   Json
   sincronizadoEm          DateTime @default(now())
 
-  consulta ConsultaParametrizada @relation(fields: [consultaParametrizadaId], references: [id])
+  consulta ConsultaParametrizada @relation(fields: [consultaParametrizadaId], references: [id], onDelete: Cascade)
 }
 
 model Fluxo {
@@ -244,7 +244,7 @@ model Fluxo {
   publicado Boolean  @default(false)
   criadoEm  DateTime @default(now())
 
-  modulo      Modulo                @relation(fields: [moduloId], references: [id])
+  modulo      Modulo                @relation(fields: [moduloId], references: [id], onDelete: Cascade)
   macroetapas Macroetapa[]
   etapas      Etapa[]
   instancias  InstanciaDeProcesso[]
@@ -256,7 +256,7 @@ model Macroetapa {
   nome    String
   ordem   Int
 
-  fluxo  Fluxo   @relation(fields: [fluxoId], references: [id])
+  fluxo  Fluxo   @relation(fields: [fluxoId], references: [id], onDelete: Cascade)
   etapas Etapa[]
 }
 
@@ -295,10 +295,10 @@ model Etapa {
   entradaRefs     Json          @default("[]")
   camposUsuario   Json          @default("[]")
 
-  fluxo      Fluxo             @relation(fields: [fluxoId], references: [id])
-  macroetapa Macroetapa        @relation(fields: [macroetapaId], references: [id])
-  agente     Agente?           @relation(fields: [agenteId], references: [id])
-  skill      Skill?            @relation(fields: [skillId], references: [id])
+  fluxo      Fluxo             @relation(fields: [fluxoId], references: [id], onDelete: Cascade)
+  macroetapa Macroetapa        @relation(fields: [macroetapaId], references: [id], onDelete: Cascade)
+  agente     Agente?           @relation(fields: [agenteId], references: [id], onDelete: Cascade)
+  skill      Skill?            @relation(fields: [skillId], references: [id], onDelete: Cascade)
   execucoes  ExecucaoDeEtapa[]
 }
 
@@ -319,7 +319,7 @@ model InstanciaDeProcesso {
   criadoEm        DateTime        @default(now())
   atualizadoEm    DateTime        @updatedAt
 
-  fluxo     Fluxo             @relation(fields: [fluxoId], references: [id])
+  fluxo     Fluxo             @relation(fields: [fluxoId], references: [id], onDelete: Cascade)
   empresa   Empresa           @relation(fields: [empresaId], references: [id])
   execucoes ExecucaoDeEtapa[]
 }
@@ -355,8 +355,8 @@ model ExecucaoDeEtapa {
   criadoEm          DateTime       @default(now())
   concluidoEm       DateTime?
 
-  instancia InstanciaDeProcesso @relation(fields: [instanciaId], references: [id])
-  etapa     Etapa               @relation(fields: [etapaId], references: [id])
+  instancia InstanciaDeProcesso @relation(fields: [instanciaId], references: [id], onDelete: Cascade)
+  etapa     Etapa               @relation(fields: [etapaId], references: [id], onDelete: Cascade)
   usuario   Usuario?            @relation(fields: [atorUsuarioId], references: [id])
 }
 

@@ -1,19 +1,24 @@
 import {
   BadRequestException,
+  ForbiddenException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { ModuloController } from './modulo.controller';
+import { FRASE_CONFIRMACAO_EXCLUSAO_MODULO } from './modulo.service';
 import type { ModuloService } from './modulo.service';
 import type { TenantContext } from '../auth/tenant-context';
 import type { AnthropicService } from '../chat/anthropic.service';
 
 describe('ModuloController', () => {
-  function buildTenantContext(empresaId: string): TenantContext {
+  function buildTenantContext(
+    empresaId: string,
+    perfil: 'admin' | 'membro' = 'admin',
+  ): TenantContext {
     return {
       get: () => ({
         usuarioId: 'usuario-1',
         empresaId,
-        perfil: 'admin' as const,
+        perfil,
       }),
     } as unknown as TenantContext;
   }
@@ -142,6 +147,68 @@ describe('ModuloController', () => {
       dadosDepois: { nome: 'Novo nome' },
     });
     expect(resultado).toEqual({ id: 'modulo-1', nome: 'Novo nome' });
+  });
+
+  it('exclui um módulo quando o perfil é admin e a frase de confirmação bate', async () => {
+    const service = {
+      remover: jest
+        .fn()
+        .mockResolvedValue({ id: 'modulo-1', nome: 'Compras', objetivo: 'X' }),
+    } as unknown as ModuloService;
+    const audit = buildAudit();
+    const controller = new ModuloController(
+      service,
+      audit,
+      buildTenantContext('empresa-1', 'admin'),
+      buildAnthropicService(),
+    );
+
+    const resultado = await controller.excluir('modulo-1', {
+      confirmacao: FRASE_CONFIRMACAO_EXCLUSAO_MODULO,
+    });
+
+    expect(service.remover).toHaveBeenCalledWith('modulo-1', 'empresa-1');
+    expect(audit.record).toHaveBeenCalledWith({
+      empresaId: 'empresa-1',
+      atorUsuarioId: 'usuario-1',
+      acao: 'modulo_excluido',
+      dadosAntes: { id: 'modulo-1', nome: 'Compras', objetivo: 'X' },
+    });
+    expect(resultado).toEqual({ ok: true });
+  });
+
+  it('rejeita exclusão de quem não é admin, sem chamar o service', async () => {
+    const service = { remover: jest.fn() } as unknown as ModuloService;
+    const audit = buildAudit();
+    const controller = new ModuloController(
+      service,
+      audit,
+      buildTenantContext('empresa-1', 'membro'),
+      buildAnthropicService(),
+    );
+
+    await expect(
+      controller.excluir('modulo-1', {
+        confirmacao: FRASE_CONFIRMACAO_EXCLUSAO_MODULO,
+      }),
+    ).rejects.toThrow(ForbiddenException);
+    expect(service.remover).not.toHaveBeenCalled();
+  });
+
+  it('rejeita exclusão se a frase de confirmação não bater, sem chamar o service', async () => {
+    const service = { remover: jest.fn() } as unknown as ModuloService;
+    const audit = buildAudit();
+    const controller = new ModuloController(
+      service,
+      audit,
+      buildTenantContext('empresa-1', 'admin'),
+      buildAnthropicService(),
+    );
+
+    await expect(
+      controller.excluir('modulo-1', { confirmacao: 'quero excluir' }),
+    ).rejects.toThrow(BadRequestException);
+    expect(service.remover).not.toHaveBeenCalled();
   });
 
   it('gera um rascunho de instruções a partir do módulo e audita', async () => {

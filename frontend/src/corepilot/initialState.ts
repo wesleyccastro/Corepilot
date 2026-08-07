@@ -57,6 +57,9 @@ export interface CorePilotState {
 
   todosModulos: Modulo[];
   modulosAdminLoading: boolean;
+  excluirModuloAlvo: Modulo | null;
+  excluirModuloTexto: string;
+  excluirModuloEnviando: boolean;
 
   kanban: KanbanColumn[];
   comprasCard: string | null;
@@ -255,6 +258,9 @@ export function createInitialState(): CorePilotState {
 
     todosModulos: [],
     modulosAdminLoading: false,
+    excluirModuloAlvo: null,
+    excluirModuloTexto: '',
+    excluirModuloEnviando: false,
 
     kanban: [
       {

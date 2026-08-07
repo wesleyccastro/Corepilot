@@ -58,6 +58,22 @@ export async function atualizarModulo(
   return (await response.json()) as Modulo;
 }
 
+export async function excluirModulo(
+  accessToken: string,
+  moduloId: string,
+  confirmacao: string,
+): Promise<void> {
+  const response = await apiFetch(`/modulos/${moduloId}`, accessToken, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirmacao }),
+  });
+  if (!response.ok) {
+    const corpo = (await response.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(corpo?.message ?? `Falha ao excluir módulo (status ${response.status})`);
+  }
+}
+
 export interface RascunhoInstrucoes {
   instrucoes: string;
 }

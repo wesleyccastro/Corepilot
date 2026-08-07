@@ -41,7 +41,7 @@ export function CorePilotApp({ accessToken, abrirWizardAoEntrar }: CorePilotAppP
         {state.view === 'admin-users' && <AdminUsers state={state} actions={actions} />}
         {state.view === 'admin-settings' && <AdminSettings state={state} actions={actions} />}
         {state.view === 'admin-company' && <AdminCompany state={state} actions={actions} accessToken={accessToken} me={me} onEmpresaUpdated={refetchMe} />}
-        {state.view === 'admin-modulos' && <AdminModulos state={state} actions={actions} />}
+        {state.view === 'admin-modulos' && <AdminModulos state={state} actions={actions} me={me} />}
         {activeModule && <CustomModuleView module={activeModule} state={state} actions={actions} />}
       </div>
 
