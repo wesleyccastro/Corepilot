@@ -60,15 +60,23 @@ export class FonteDeDadosService {
     return fonte;
   }
 
-  async update(fonteDeDadosId: string, empresaId: string, dto: UpdateFonteDeDadosDto) {
+  async update(
+    fonteDeDadosId: string,
+    empresaId: string,
+    dto: UpdateFonteDeDadosDto,
+  ) {
     const fonte = await this.findByIdInEmpresa(fonteDeDadosId, empresaId);
-    const configuracaoAtual = fonte.configuracao as unknown as ConfiguracaoFonteDeDados;
+    const configuracaoAtual =
+      fonte.configuracao as unknown as ConfiguracaoFonteDeDados;
 
     const configuracao: ConfiguracaoFonteDeDados = {
       serverUrl: dto.serverUrl ?? configuracaoAtual.serverUrl,
       username: dto.username ?? configuracaoAtual.username,
       senhaCriptografada: dto.senha
-        ? criptografar(dto.senha, this.config.getOrThrow<string>('ERP_ENCRYPTION_KEY'))
+        ? criptografar(
+            dto.senha,
+            this.config.getOrThrow<string>('ERP_ENCRYPTION_KEY'),
+          )
         : configuracaoAtual.senhaCriptografada,
       codSistema: dto.codSistema ?? configuracaoAtual.codSistema,
       codColigada: dto.codColigada ?? configuracaoAtual.codColigada,

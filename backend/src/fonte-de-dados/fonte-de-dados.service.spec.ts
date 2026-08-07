@@ -35,15 +35,20 @@ describe('FonteDeDadosService', () => {
   it('cria uma fonte de dados com a senha criptografada, nunca em texto plano', async () => {
     const { prisma, config } = buildDeps();
     (prisma.fonteDeDados.create as jest.Mock).mockImplementation(
-      ({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: 'fonte-1', ...data }),
+      ({ data }: { data: Record<string, unknown> }) =>
+        Promise.resolve({ id: 'fonte-1', ...data }),
     );
     const service = new FonteDeDadosService(prisma, config);
 
     const resultado = await service.create('empresa-1', dto);
 
-    const configuracaoSalva = resultado.configuracao as { senhaCriptografada: string };
+    const configuracaoSalva = resultado.configuracao as {
+      senhaCriptografada: string;
+    };
     expect(configuracaoSalva.senhaCriptografada).not.toBe('segredo123');
-    expect(descriptografar(configuracaoSalva.senhaCriptografada, CHAVE)).toBe('segredo123');
+    expect(descriptografar(configuracaoSalva.senhaCriptografada, CHAVE)).toBe(
+      'segredo123',
+    );
   });
 
   it('lista fontes de dados só da empresa informada', async () => {
@@ -64,9 +69,9 @@ describe('FonteDeDadosService', () => {
     (prisma.fonteDeDados.findFirst as jest.Mock).mockResolvedValue(null);
     const service = new FonteDeDadosService(prisma, config);
 
-    await expect(service.findByIdInEmpresa('fonte-x', 'empresa-1')).rejects.toThrow(
-      NotFoundException,
-    );
+    await expect(
+      service.findByIdInEmpresa('fonte-x', 'empresa-1'),
+    ).rejects.toThrow(NotFoundException);
   });
 
   describe('update', () => {
@@ -85,13 +90,19 @@ describe('FonteDeDadosService', () => {
 
     it('atualiza só os campos informados e mantém a senha antiga se não vier uma nova', async () => {
       const { prisma, config } = buildDeps();
-      (prisma.fonteDeDados.findFirst as jest.Mock).mockResolvedValue(fonteExistente);
+      (prisma.fonteDeDados.findFirst as jest.Mock).mockResolvedValue(
+        fonteExistente,
+      );
       (prisma.fonteDeDados.update as jest.Mock).mockImplementation(
-        ({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: 'fonte-1', ...data }),
+        ({ data }: { data: Record<string, unknown> }) =>
+          Promise.resolve({ id: 'fonte-1', ...data }),
       );
       const service = new FonteDeDadosService(prisma, config);
 
-      await service.update('fonte-1', 'empresa-1', { nome: 'RM Novo', serverUrl: 'http://novo:8051' });
+      await service.update('fonte-1', 'empresa-1', {
+        nome: 'RM Novo',
+        serverUrl: 'http://novo:8051',
+      });
 
       expect(prisma.fonteDeDados.update).toHaveBeenCalledWith({
         where: { id: 'fonte-1' },
@@ -113,17 +124,28 @@ describe('FonteDeDadosService', () => {
 
     it('re-criptografa a senha só quando uma nova senha é informada', async () => {
       const { prisma, config } = buildDeps();
-      (prisma.fonteDeDados.findFirst as jest.Mock).mockResolvedValue(fonteExistente);
+      (prisma.fonteDeDados.findFirst as jest.Mock).mockResolvedValue(
+        fonteExistente,
+      );
       (prisma.fonteDeDados.update as jest.Mock).mockImplementation(
-        ({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: 'fonte-1', ...data }),
+        ({ data }: { data: Record<string, unknown> }) =>
+          Promise.resolve({ id: 'fonte-1', ...data }),
       );
       const service = new FonteDeDadosService(prisma, config);
 
-      const resultado = await service.update('fonte-1', 'empresa-1', { senha: 'nova-senha' });
+      const resultado = await service.update('fonte-1', 'empresa-1', {
+        senha: 'nova-senha',
+      });
 
-      const configuracaoSalva = (resultado as { configuracao: { senhaCriptografada: string } }).configuracao;
-      expect(configuracaoSalva.senhaCriptografada).not.toBe('iv:tag:cifrado-antigo');
-      expect(descriptografar(configuracaoSalva.senhaCriptografada, CHAVE)).toBe('nova-senha');
+      const configuracaoSalva = (
+        resultado as { configuracao: { senhaCriptografada: string } }
+      ).configuracao;
+      expect(configuracaoSalva.senhaCriptografada).not.toBe(
+        'iv:tag:cifrado-antigo',
+      );
+      expect(descriptografar(configuracaoSalva.senhaCriptografada, CHAVE)).toBe(
+        'nova-senha',
+      );
     });
 
     it('lança NotFoundException ao tentar atualizar fonte de outra empresa', async () => {
@@ -131,9 +153,9 @@ describe('FonteDeDadosService', () => {
       (prisma.fonteDeDados.findFirst as jest.Mock).mockResolvedValue(null);
       const service = new FonteDeDadosService(prisma, config);
 
-      await expect(service.update('fonte-1', 'empresa-2', { nome: 'x' })).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.update('fonte-1', 'empresa-2', { nome: 'x' }),
+      ).rejects.toThrow(NotFoundException);
       expect(prisma.fonteDeDados.update).not.toHaveBeenCalled();
     });
   });

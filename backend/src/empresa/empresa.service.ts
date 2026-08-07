@@ -2,7 +2,12 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { UpdateEmpresaDto } from './dto/update-empresa.dto';
 
-const TIPOS_LOGO_PERMITIDOS = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
+const TIPOS_LOGO_PERMITIDOS = [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/svg+xml',
+];
 const TAMANHO_MAXIMO_LOGO_BYTES = 2 * 1024 * 1024;
 
 export interface EmpresaResumo {
@@ -46,7 +51,10 @@ export class EmpresaService {
       where: { id: empresaId },
       data: {
         nome: dto.nome?.trim(),
-        razaoSocial: dto.razaoSocial === undefined ? undefined : (dto.razaoSocial?.trim() || null),
+        razaoSocial:
+          dto.razaoSocial === undefined
+            ? undefined
+            : dto.razaoSocial?.trim() || null,
       },
     });
 

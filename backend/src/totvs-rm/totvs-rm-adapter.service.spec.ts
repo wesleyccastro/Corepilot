@@ -20,9 +20,13 @@ describe('TotvsRmAdapterService', () => {
     } as Response);
     const service = new TotvsRmAdapterService();
 
-    const resultado = await service.realizarConsultaSQL(conexao, 'SALDOESTOQUEINSU', {
-      CODFILIAL: '001',
-    });
+    const resultado = await service.realizarConsultaSQL(
+      conexao,
+      'SALDOESTOQUEINSU',
+      {
+        CODFILIAL: '001',
+      },
+    );
 
     expect(global.fetch).toHaveBeenCalledWith(
       'http://servidor:8051/wsConsultaSQL/IwsConsultaSQL',
@@ -30,7 +34,8 @@ describe('TotvsRmAdapterService', () => {
         method: 'POST',
         headers: expect.objectContaining({
           'Content-Type': 'text/xml; charset=utf-8',
-          SOAPAction: '"http://www.totvs.com/IwsConsultaSQL/RealizarConsultaSQL"',
+          SOAPAction:
+            '"http://www.totvs.com/IwsConsultaSQL/RealizarConsultaSQL"',
         }),
       }),
     );
@@ -39,7 +44,10 @@ describe('TotvsRmAdapterService', () => {
 
   it('lança erro com a mensagem de negócio do RM quando a resposta contém um faultstring', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValue({
-      text: () => Promise.resolve('<soap:Fault><faultstring>Coligada inválida</faultstring></soap:Fault>'),
+      text: () =>
+        Promise.resolve(
+          '<soap:Fault><faultstring>Coligada inválida</faultstring></soap:Fault>',
+        ),
     } as Response);
     const service = new TotvsRmAdapterService();
 
@@ -52,6 +60,8 @@ describe('TotvsRmAdapterService', () => {
     jest.spyOn(global, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'));
     const service = new TotvsRmAdapterService();
 
-    await expect(service.realizarConsultaSQL(conexao, 'X', {})).rejects.toThrow('inacessível');
+    await expect(service.realizarConsultaSQL(conexao, 'X', {})).rejects.toThrow(
+      'inacessível',
+    );
   });
 });

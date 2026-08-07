@@ -9,7 +9,11 @@ import type { TenantContext } from '../auth/tenant-context';
 describe('FerramentaController', () => {
   function buildTenantContext(): TenantContext {
     return {
-      get: () => ({ usuarioId: 'usuario-1', empresaId: 'empresa-1', perfil: 'admin' as const }),
+      get: () => ({
+        usuarioId: 'usuario-1',
+        empresaId: 'empresa-1',
+        perfil: 'admin' as const,
+      }),
     } as unknown as TenantContext;
   }
 
@@ -17,7 +21,9 @@ describe('FerramentaController', () => {
     const skillService = {
       findByIdInEmpresa: jest.fn().mockResolvedValue({ id: 'skill-1' }),
     } as unknown as SkillService;
-    const consultaService = { findByIdInEmpresa: jest.fn() } as unknown as ConsultaService;
+    const consultaService = {
+      findByIdInEmpresa: jest.fn(),
+    } as unknown as ConsultaService;
     const prisma = { skill: { update: jest.fn() } } as unknown as PrismaService;
     const audit = { record: jest.fn() } as unknown as AuditService;
     return { skillService, consultaService, prisma, audit };

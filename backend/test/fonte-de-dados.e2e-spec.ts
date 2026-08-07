@@ -4,18 +4,22 @@ import request from 'supertest';
 import type { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { createTestUser, deleteTestUser, signInTestUser } from '../src/testing/supabase-admin.helper';
+import {
+  createTestUser,
+  deleteTestUser,
+  signInTestUser,
+} from '../src/testing/supabase-admin.helper';
 import { provisionUsuarioParaEmpresa } from '../src/testing/provision-usuario.helper';
 
 jest.setTimeout(30000);
 
 const TEM_CREDENCIAIS_RM_DE_TESTE = Boolean(
   process.env.TOTVS_RM_TEST_SERVER_URL &&
-    process.env.TOTVS_RM_TEST_USERNAME &&
-    process.env.TOTVS_RM_TEST_PASSWORD &&
-    process.env.TOTVS_RM_TEST_COD_SISTEMA &&
-    process.env.TOTVS_RM_TEST_COD_COLIGADA &&
-    process.env.TOTVS_RM_TEST_COD_SENTENCA,
+  process.env.TOTVS_RM_TEST_USERNAME &&
+  process.env.TOTVS_RM_TEST_PASSWORD &&
+  process.env.TOTVS_RM_TEST_COD_SISTEMA &&
+  process.env.TOTVS_RM_TEST_COD_COLIGADA &&
+  process.env.TOTVS_RM_TEST_COD_SENTENCA,
 );
 
 describe('Fontes de Dados (isolamento entre tenants + fluxo real quando o RM de teste está configurado)', () => {
@@ -25,7 +29,9 @@ describe('Fontes de Dados (isolamento entre tenants + fluxo real quando o RM de 
   const empresaIdsParaLimpar: string[] = [];
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
     app = moduleRef.createNestApplication();
     await app.init();
     prisma = app.get(PrismaService);
@@ -34,7 +40,11 @@ describe('Fontes de Dados (isolamento entre tenants + fluxo real quando o RM de 
   afterAll(async () => {
     try {
       await prisma.consultaResultado.deleteMany({
-        where: { consulta: { fonteDeDados: { empresaId: { in: empresaIdsParaLimpar } } } },
+        where: {
+          consulta: {
+            fonteDeDados: { empresaId: { in: empresaIdsParaLimpar } },
+          },
+        },
       });
     } catch (erro) {
       console.warn('Falha ao limpar resultados de teste', erro);
@@ -47,37 +57,54 @@ describe('Fontes de Dados (isolamento entre tenants + fluxo real quando o RM de 
       console.warn('Falha ao limpar consultas de teste', erro);
     }
     try {
-      await prisma.fonteDeDados.deleteMany({ where: { empresaId: { in: empresaIdsParaLimpar } } });
+      await prisma.fonteDeDados.deleteMany({
+        where: { empresaId: { in: empresaIdsParaLimpar } },
+      });
     } catch (erro) {
       console.warn('Falha ao limpar fontes de dados de teste', erro);
     }
     try {
-      await prisma.modulo.deleteMany({ where: { empresaId: { in: empresaIdsParaLimpar } } });
+      await prisma.modulo.deleteMany({
+        where: { empresaId: { in: empresaIdsParaLimpar } },
+      });
     } catch (erro) {
       console.warn('Falha ao limpar módulos de teste', erro);
     }
     try {
-      await prisma.usuarioEmpresa.deleteMany({ where: { empresaId: { in: empresaIdsParaLimpar } } });
+      await prisma.usuarioEmpresa.deleteMany({
+        where: { empresaId: { in: empresaIdsParaLimpar } },
+      });
     } catch (erro) {
       console.warn('Falha ao limpar vínculos usuário-empresa de teste', erro);
     }
     try {
-      await prisma.usuario.deleteMany({ where: { supabaseUserId: { in: authUserIdsParaLimpar } } });
+      await prisma.usuario.deleteMany({
+        where: { supabaseUserId: { in: authUserIdsParaLimpar } },
+      });
     } catch (erro) {
       console.warn('Falha ao limpar usuários de teste', erro);
     }
     try {
-      await prisma.empresa.deleteMany({ where: { id: { in: empresaIdsParaLimpar } } });
+      await prisma.empresa.deleteMany({
+        where: { id: { in: empresaIdsParaLimpar } },
+      });
     } catch (erro) {
       console.warn('Falha ao limpar empresas de teste', erro);
     }
 
-    await Promise.allSettled(authUserIdsParaLimpar.map((userId) => deleteTestUser(userId)));
+    await Promise.allSettled(
+      authUserIdsParaLimpar.map((userId) => deleteTestUser(userId)),
+    );
     await app.close();
   });
 
-  async function criarEmpresaComUsuarioLogado(nomeEmpresa: string, email: string) {
-    const empresa = await prisma.empresa.create({ data: { nome: nomeEmpresa } });
+  async function criarEmpresaComUsuarioLogado(
+    nomeEmpresa: string,
+    email: string,
+  ) {
+    const empresa = await prisma.empresa.create({
+      data: { nome: nomeEmpresa },
+    });
     empresaIdsParaLimpar.push(empresa.id);
 
     const password = 'TesteFase4!23';
@@ -122,7 +149,9 @@ describe('Fontes de Dados (isolamento entre tenants + fluxo real quando o RM de 
       .expect(201);
     const fonteDeDadosId = fonteResposta.body.id as string;
 
-    expect(fonteResposta.body.configuracao).not.toHaveProperty('senhaCriptografada');
+    expect(fonteResposta.body.configuracao).not.toHaveProperty(
+      'senhaCriptografada',
+    );
     expect(fonteResposta.body.configuracao).not.toHaveProperty('senha');
 
     const moduloResposta = await request(app.getHttpServer())
@@ -140,7 +169,9 @@ describe('Fontes de Dados (isolamento entre tenants + fluxo real quando o RM de 
         nome: 'Saldo de estoque',
         codSentenca: 'SALDOESTOQUEINSU',
         parametrosSincronizacao: { CODFILIAL: '001' },
-        camposFiltro: [{ nome: 'codProduto', tipo: 'string', obrigatorio: true }],
+        camposFiltro: [
+          { nome: 'codProduto', tipo: 'string', obrigatorio: true },
+        ],
       })
       .expect(201);
 
@@ -168,9 +199,11 @@ describe('Fontes de Dados (isolamento entre tenants + fluxo real quando o RM de 
       .get('/fontes-de-dados')
       .set('Authorization', `Bearer ${empresaB.accessToken}`)
       .expect(200);
-    expect((listaFontesB.body as Array<{ id: string }>).some((f) => f.id === fonteDeDadosId)).toBe(
-      false,
-    );
+    expect(
+      (listaFontesB.body as Array<{ id: string }>).some(
+        (f) => f.id === fonteDeDadosId,
+      ),
+    ).toBe(false);
   });
 
   (TEM_CREDENCIAIS_RM_DE_TESTE ? it : it.skip)(

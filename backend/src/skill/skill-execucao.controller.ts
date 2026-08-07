@@ -1,11 +1,22 @@
-import { Body, Controller, Get, Param, Post, UnprocessableEntityException, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  UnprocessableEntityException,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TenantGuard } from '../auth/tenant.guard';
 import { TenantContext } from '../auth/tenant-context';
 import { PrismaService } from '../prisma/prisma.service';
 import { SkillService } from './skill.service';
 import { SkillExecucaoService } from './skill-execucao.service';
-import { AnthropicService, type MensagemConversa } from '../chat/anthropic.service';
+import {
+  AnthropicService,
+  type MensagemConversa,
+} from '../chat/anthropic.service';
 import { AuditService } from '../audit/audit.service';
 import { construirSchemaSaida, type CampoSaida } from './schema-builder';
 import {
@@ -35,7 +46,9 @@ function montarSystemPrompt(
     partes.push(`RESTRIÇÕES (nunca viole):\n${agente.guardrails.trim()}`);
   }
   if (agente.regraEscalonamento?.trim()) {
-    partes.push(`ESCALONAMENTO PARA HUMANO:\n${agente.regraEscalonamento.trim()}`);
+    partes.push(
+      `ESCALONAMENTO PARA HUMANO:\n${agente.regraEscalonamento.trim()}`,
+    );
   }
 
   return partes.join('\n\n');
@@ -63,11 +76,16 @@ export class SkillExecucaoController {
   }
 
   @Post()
-  async executar(@Param('skillId') skillId: string, @Body() body: ExecutarSkillDto) {
+  async executar(
+    @Param('skillId') skillId: string,
+    @Body() body: ExecutarSkillDto,
+  ) {
     const { usuarioId, empresaId } = this.tenantContext.get();
     const skill = await this.skillService.findByIdInEmpresa(skillId, empresaId);
 
-    const schema = construirSchemaSaida(skill.camposSaida as unknown as CampoSaida[]);
+    const schema = construirSchemaSaida(
+      skill.camposSaida as unknown as CampoSaida[],
+    );
     const system = montarSystemPrompt(skill.agente, skill);
 
     const response =
@@ -79,7 +97,12 @@ export class SkillExecucaoController {
             maxTokens: 4096,
             schema,
           })
-        : await this.executarComFerramentas(skill, system, body.entrada, schema);
+        : await this.executarComFerramentas(
+            skill,
+            system,
+            body.entrada,
+            schema,
+          );
 
     if (!response.parsed_output) {
       throw new UnprocessableEntityException(
@@ -138,20 +161,32 @@ export class SkillExecucaoController {
         model: skill.agente.modeloIA,
         maxTokens: 4096,
         tools,
-      })) as unknown as { stop_reason: string; content: Array<Record<string, unknown>> };
+      })) as unknown as {
+        stop_reason: string;
+        content: Array<Record<string, unknown>>;
+      };
 
-      mensagens = [...mensagens, { role: 'assistant', content: resposta.content }];
+      mensagens = [
+        ...mensagens,
+        { role: 'assistant', content: resposta.content },
+      ];
 
       if (resposta.stop_reason !== 'tool_use') {
         break;
       }
 
-      const blocosDeTool = resposta.content.filter((bloco) => bloco.type === 'tool_use');
+      const blocosDeTool = resposta.content.filter(
+        (bloco) => bloco.type === 'tool_use',
+      );
 
       const resultadosDeTool = await Promise.all(
         blocosDeTool.map(async (bloco) => {
           const consultaId = consultaIdDaFerramenta(bloco.name as string);
-          const linhas = await buscarDadosLocaisConsulta(this.prisma, consultaId, bloco.input as Record<string, unknown>);
+          const linhas = await buscarDadosLocaisConsulta(
+            this.prisma,
+            consultaId,
+            bloco.input as Record<string, unknown>,
+          );
           return {
             type: 'tool_result',
             tool_use_id: bloco.id as string,

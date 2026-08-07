@@ -3,7 +3,12 @@ import { construirInputSchemaFerramenta } from './tool-schema-builder';
 describe('construirInputSchemaFerramenta', () => {
   it('constrói um JSON Schema com properties e required a partir dos campos', () => {
     const schema = construirInputSchemaFerramenta([
-      { nome: 'codProduto', tipo: 'string', descricao: 'Código do produto', obrigatorio: true },
+      {
+        nome: 'codProduto',
+        tipo: 'string',
+        descricao: 'Código do produto',
+        obrigatorio: true,
+      },
       { nome: 'quantidadeMinima', tipo: 'number', obrigatorio: false },
     ]);
 

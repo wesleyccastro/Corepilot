@@ -1,4 +1,13 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TenantGuard } from '../auth/tenant.guard';
 import { TenantContext } from '../auth/tenant-context';
@@ -17,13 +26,20 @@ export class ConversaTagController {
   ) {}
 
   @Post()
-  async criar(@Param('moduloId') moduloId: string, @Body() body: CriarConversaTagDto) {
+  async criar(
+    @Param('moduloId') moduloId: string,
+    @Body() body: CriarConversaTagDto,
+  ) {
     if (!body.nome?.trim()) {
       throw new BadRequestException('nome é obrigatório');
     }
 
     const { empresaId } = this.tenantContext.get();
-    return this.conversaTagService.create(moduloId, empresaId, body.nome.trim());
+    return this.conversaTagService.create(
+      moduloId,
+      empresaId,
+      body.nome.trim(),
+    );
   }
 
   @Get()

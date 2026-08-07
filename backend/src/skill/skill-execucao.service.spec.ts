@@ -26,10 +26,19 @@ describe('SkillExecucaoService', () => {
 
   it('appendExecucao grava entrada, saida e tokens', async () => {
     const prisma = buildPrismaMock();
-    (prisma.skillExecucao.create as jest.Mock).mockResolvedValue({ id: 'execucao-1' });
+    (prisma.skillExecucao.create as jest.Mock).mockResolvedValue({
+      id: 'execucao-1',
+    });
     const service = new SkillExecucaoService(prisma);
 
-    await service.appendExecucao('skill-1', 'usuario-1', 'Pedido: 10 parafusos', { titulo: 'ok' }, 10, 5);
+    await service.appendExecucao(
+      'skill-1',
+      'usuario-1',
+      'Pedido: 10 parafusos',
+      { titulo: 'ok' },
+      10,
+      5,
+    );
 
     expect(prisma.skillExecucao.create).toHaveBeenCalledWith({
       data: {

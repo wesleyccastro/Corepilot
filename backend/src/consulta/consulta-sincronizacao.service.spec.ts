@@ -13,8 +13,12 @@ describe('ConsultaSincronizacaoService', () => {
       consultaResultado: { deleteMany: jest.fn(), createMany: jest.fn() },
       fonteDeDados: { update: jest.fn() },
     } as unknown as PrismaService;
-    const config = { getOrThrow: jest.fn().mockReturnValue(CHAVE) } as unknown as ConfigService;
-    const totvsRmAdapter = { realizarConsultaSQL: jest.fn() } as unknown as TotvsRmAdapterService;
+    const config = {
+      getOrThrow: jest.fn().mockReturnValue(CHAVE),
+    } as unknown as ConfigService;
+    const totvsRmAdapter = {
+      realizarConsultaSQL: jest.fn(),
+    } as unknown as TotvsRmAdapterService;
     return { prisma, config, totvsRmAdapter };
   }
 
@@ -43,12 +47,19 @@ describe('ConsultaSincronizacaoService', () => {
     (totvsRmAdapter.realizarConsultaSQL as jest.Mock).mockResolvedValue([
       { CODPRODUTO: '1', QUANTIDADE: '10' },
     ]);
-    const service = new ConsultaSincronizacaoService(prisma, config, totvsRmAdapter);
+    const service = new ConsultaSincronizacaoService(
+      prisma,
+      config,
+      totvsRmAdapter,
+    );
 
     const resultado = await service.executarSincronizacao(consulta);
 
     expect(totvsRmAdapter.realizarConsultaSQL).toHaveBeenCalledWith(
-      expect.objectContaining({ serverUrl: 'http://servidor:8051', senha: 'segredo' }),
+      expect.objectContaining({
+        serverUrl: 'http://servidor:8051',
+        senha: 'segredo',
+      }),
       'SALDOESTOQUEINSU',
       { CODFILIAL: '001' },
     );
@@ -56,7 +67,12 @@ describe('ConsultaSincronizacaoService', () => {
       where: { consultaParametrizadaId: 'consulta-1' },
     });
     expect(prisma.consultaResultado.createMany).toHaveBeenCalledWith({
-      data: [{ consultaParametrizadaId: 'consulta-1', dados: { CODPRODUTO: '1', QUANTIDADE: '10' } }],
+      data: [
+        {
+          consultaParametrizadaId: 'consulta-1',
+          dados: { CODPRODUTO: '1', QUANTIDADE: '10' },
+        },
+      ],
     });
     expect(prisma.consultaParametrizada.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -81,7 +97,11 @@ describe('ConsultaSincronizacaoService', () => {
     (totvsRmAdapter.realizarConsultaSQL as jest.Mock).mockRejectedValue(
       new Error('Coligada inválida'),
     );
-    const service = new ConsultaSincronizacaoService(prisma, config, totvsRmAdapter);
+    const service = new ConsultaSincronizacaoService(
+      prisma,
+      config,
+      totvsRmAdapter,
+    );
 
     const resultado = await service.executarSincronizacao(consulta);
 

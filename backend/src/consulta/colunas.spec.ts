@@ -9,7 +9,9 @@ describe('mesclarColunas', () => {
   });
 
   it('preserva a descrição de colunas já descritas anteriormente', () => {
-    const existentes = [{ nomeTecnico: 'CODPRODUTO', descricao: 'Código do produto' }];
+    const existentes = [
+      { nomeTecnico: 'CODPRODUTO', descricao: 'Código do produto' },
+    ];
     expect(mesclarColunas(existentes, ['CODPRODUTO', 'QUANTIDADE'])).toEqual([
       { nomeTecnico: 'CODPRODUTO', descricao: 'Código do produto' },
       { nomeTecnico: 'QUANTIDADE', descricao: null },
@@ -17,7 +19,9 @@ describe('mesclarColunas', () => {
   });
 
   it('descarta colunas que não aparecem mais no resultado atual', () => {
-    const existentes = [{ nomeTecnico: 'COLUNA_ANTIGA', descricao: 'Não existe mais' }];
+    const existentes = [
+      { nomeTecnico: 'COLUNA_ANTIGA', descricao: 'Não existe mais' },
+    ];
     expect(mesclarColunas(existentes, ['CODPRODUTO'])).toEqual([
       { nomeTecnico: 'CODPRODUTO', descricao: null },
     ]);

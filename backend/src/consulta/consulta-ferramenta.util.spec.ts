@@ -18,14 +18,17 @@ describe('consulta-ferramenta.util', () => {
       {
         id: 'consulta-1',
         nome: 'Saldo de estoque',
-        camposFiltro: [{ nome: 'codProduto', tipo: 'string', obrigatorio: true }],
+        camposFiltro: [
+          { nome: 'codProduto', tipo: 'string', obrigatorio: true },
+        ],
       },
     ]);
 
     expect(tools).toEqual([
       {
         name: 'consulta_consulta-1',
-        description: 'Consulta "Saldo de estoque" com dados sincronizados do TOTVS RM.',
+        description:
+          'Consulta "Saldo de estoque" com dados sincronizados do TOTVS RM.',
         input_schema: {
           type: 'object',
           properties: { codProduto: { type: 'string' } },
@@ -38,17 +41,23 @@ describe('consulta-ferramenta.util', () => {
   it('buscarDadosLocaisConsulta filtra por consultaId e pelos valores informados, nunca chama o RM', async () => {
     const prisma = {
       consultaResultado: {
-        findMany: jest.fn().mockResolvedValue([
-          { dados: { codProduto: 'X1', saldo: 42 } },
-          { dados: { codProduto: 'X2', saldo: 7 } },
-        ]),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { dados: { codProduto: 'X1', saldo: 42 } },
+            { dados: { codProduto: 'X2', saldo: 7 } },
+          ]),
       },
     } as unknown as PrismaService;
 
-    const resultado = await buscarDadosLocaisConsulta(prisma, 'consulta-1', { codProduto: 'X1' });
+    const resultado = await buscarDadosLocaisConsulta(prisma, 'consulta-1', {
+      codProduto: 'X1',
+    });
 
     expect(prisma.consultaResultado.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { consultaParametrizadaId: 'consulta-1' } }),
+      expect.objectContaining({
+        where: { consultaParametrizadaId: 'consulta-1' },
+      }),
     );
     expect(resultado).toEqual([{ codProduto: 'X1', saldo: 42 }]);
   });
@@ -57,7 +66,9 @@ describe('consulta-ferramenta.util', () => {
     const prisma = {
       consultaResultado: {
         findMany: jest.fn().mockResolvedValue(
-          Array.from({ length: 50 }, (_, i) => ({ dados: { codProduto: `X${i}` } })),
+          Array.from({ length: 50 }, (_, i) => ({
+            dados: { codProduto: `X${i}` },
+          })),
         ),
       },
     } as unknown as PrismaService;
@@ -70,14 +81,18 @@ describe('consulta-ferramenta.util', () => {
   it('o filtro é substring case-insensitive, não igualdade exata — "Fox" bate com "FOXXPRO"', async () => {
     const prisma = {
       consultaResultado: {
-        findMany: jest.fn().mockResolvedValue([
-          { dados: { NOMEFANTASIA: 'FOXXPRO', TALHAO: 'Pivo 20' } },
-          { dados: { NOMEFANTASIA: 'DRIVE', TALHAO: 'Pivo 01' } },
-        ]),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { dados: { NOMEFANTASIA: 'FOXXPRO', TALHAO: 'Pivo 20' } },
+            { dados: { NOMEFANTASIA: 'DRIVE', TALHAO: 'Pivo 01' } },
+          ]),
       },
     } as unknown as PrismaService;
 
-    const resultado = await buscarDadosLocaisConsulta(prisma, 'consulta-1', { NOMEFANTASIA: 'fox' });
+    const resultado = await buscarDadosLocaisConsulta(prisma, 'consulta-1', {
+      NOMEFANTASIA: 'fox',
+    });
 
     expect(resultado).toEqual([{ NOMEFANTASIA: 'FOXXPRO', TALHAO: 'Pivo 20' }]);
   });

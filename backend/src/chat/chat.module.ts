@@ -8,7 +8,13 @@ import { ConversaModule } from '../conversa/conversa.module';
 import { ConsultaModule } from '../consulta/consulta.module';
 
 @Module({
-  imports: [AuthModule, AuditModule, ConversaModule, ConsultaModule, AnthropicModule],
+  imports: [
+    AuthModule,
+    AuditModule,
+    ConversaModule,
+    ConsultaModule,
+    AnthropicModule,
+  ],
   controllers: [MensagemController],
   providers: [MensagemService],
   exports: [AnthropicModule],

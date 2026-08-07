@@ -4,11 +4,19 @@ import type { TenantContext } from '../auth/tenant-context';
 
 describe('EmpresaController', () => {
   function buildTenantContext(empresaId: string): TenantContext {
-    return { get: () => ({ usuarioId: 'usuario-1', empresaId, perfil: 'admin' as const }) } as unknown as TenantContext;
+    return {
+      get: () => ({
+        usuarioId: 'usuario-1',
+        empresaId,
+        perfil: 'admin' as const,
+      }),
+    } as unknown as TenantContext;
   }
 
   function buildAudit() {
-    return { record: jest.fn() } as unknown as import('../audit/audit.service').AuditService;
+    return {
+      record: jest.fn(),
+    } as unknown as import('../audit/audit.service').AuditService;
   }
 
   const arquivo = {
@@ -26,7 +34,11 @@ describe('EmpresaController', () => {
       }),
     } as unknown as EmpresaService;
     const audit = buildAudit();
-    const controller = new EmpresaController(service, audit, buildTenantContext('empresa-1'));
+    const controller = new EmpresaController(
+      service,
+      audit,
+      buildTenantContext('empresa-1'),
+    );
 
     const resultado = await controller.atualizarLogo(arquivo);
 
@@ -46,12 +58,20 @@ describe('EmpresaController', () => {
 
   it('propaga o erro do service quando nenhum arquivo é enviado', async () => {
     const service = {
-      atualizarLogo: jest.fn().mockRejectedValue(new Error('Nenhum arquivo enviado')),
+      atualizarLogo: jest
+        .fn()
+        .mockRejectedValue(new Error('Nenhum arquivo enviado')),
     } as unknown as EmpresaService;
     const audit = buildAudit();
-    const controller = new EmpresaController(service, audit, buildTenantContext('empresa-1'));
+    const controller = new EmpresaController(
+      service,
+      audit,
+      buildTenantContext('empresa-1'),
+    );
 
-    await expect(controller.atualizarLogo(undefined)).rejects.toThrow('Nenhum arquivo enviado');
+    await expect(controller.atualizarLogo(undefined)).rejects.toThrow(
+      'Nenhum arquivo enviado',
+    );
     expect(audit.record).not.toHaveBeenCalled();
   });
 
@@ -65,7 +85,11 @@ describe('EmpresaController', () => {
       }),
     } as unknown as EmpresaService;
     const audit = buildAudit();
-    const controller = new EmpresaController(service, audit, buildTenantContext('empresa-1'));
+    const controller = new EmpresaController(
+      service,
+      audit,
+      buildTenantContext('empresa-1'),
+    );
 
     const resultado = await controller.atualizar({
       nome: 'Grupo LFG Agro',
@@ -80,7 +104,10 @@ describe('EmpresaController', () => {
       empresaId: 'empresa-1',
       atorUsuarioId: 'usuario-1',
       acao: 'empresa_atualizada',
-      dadosDepois: { nome: 'Grupo LFG Agro', razaoSocial: 'LFG Agronegócios Ltda' },
+      dadosDepois: {
+        nome: 'Grupo LFG Agro',
+        razaoSocial: 'LFG Agronegócios Ltda',
+      },
     });
     expect(resultado).toEqual({
       id: 'empresa-1',

@@ -15,7 +15,10 @@ export class ConsultaService {
 
   async create(moduloId: string, empresaId: string, dto: CreateConsultaDto) {
     await this.moduloService.findByIdInEmpresa(moduloId, empresaId);
-    await this.fonteDeDadosService.findByIdInEmpresa(dto.fonteDeDadosId, empresaId);
+    await this.fonteDeDadosService.findByIdInEmpresa(
+      dto.fonteDeDadosId,
+      empresaId,
+    );
 
     return this.prisma.consultaParametrizada.create({
       data: {
@@ -23,7 +26,7 @@ export class ConsultaService {
         fonteDeDadosId: dto.fonteDeDadosId,
         nome: dto.nome,
         codSentenca: dto.codSentenca,
-        parametrosSincronizacao: dto.parametrosSincronizacao as unknown as Prisma.InputJsonValue,
+        parametrosSincronizacao: dto.parametrosSincronizacao,
         camposFiltro: dto.camposFiltro as unknown as Prisma.InputJsonValue,
       },
     });
@@ -61,7 +64,10 @@ export class ConsultaService {
 
     return this.prisma.consultaParametrizada.update({
       where: { id: consultaId },
-      data: { sincronizacaoAtiva: ativa, intervaloSincronizacaoMinutos: intervaloMinutos },
+      data: {
+        sincronizacaoAtiva: ativa,
+        intervaloSincronizacaoMinutos: intervaloMinutos,
+      },
     });
   }
 }

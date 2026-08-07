@@ -14,9 +14,16 @@ export class InstanciaController {
   ) {}
 
   @Post()
-  async criar(@Param('moduloId') moduloId: string, @Body() body: CriarInstanciaDto) {
+  async criar(
+    @Param('moduloId') moduloId: string,
+    @Body() body: CriarInstanciaDto,
+  ) {
     const { empresaId } = this.tenantContext.get();
-    return this.engine.criarInstancia(moduloId, empresaId, body.dadosIniciais ?? {});
+    return this.engine.criarInstancia(
+      moduloId,
+      empresaId,
+      body.dadosIniciais ?? {},
+    );
   }
 
   @Get()

@@ -1,8 +1,14 @@
-import { decodificarXml, extrairMensagemErro, extrairResultados } from './totvs-rm-parser';
+import {
+  decodificarXml,
+  extrairMensagemErro,
+  extrairResultados,
+} from './totvs-rm-parser';
 
 describe('totvs-rm-parser', () => {
   it('decodifica entidades XML escapadas', () => {
-    expect(decodificarXml('&lt;tag&gt; A &amp; B &quot;C&quot;')).toBe('<tag> A & B "C"');
+    expect(decodificarXml('&lt;tag&gt; A &amp; B &quot;C&quot;')).toBe(
+      '<tag> A & B "C"',
+    );
   });
 
   it('extrai múltiplas linhas de <Resultado>', () => {
@@ -23,7 +29,8 @@ describe('totvs-rm-parser', () => {
   });
 
   it('extrai mensagem de erro de faultstring', () => {
-    const xml = '<soap:Fault><faultstring>Coligada inválida</faultstring></soap:Fault>';
+    const xml =
+      '<soap:Fault><faultstring>Coligada inválida</faultstring></soap:Fault>';
     expect(extrairMensagemErro(xml)).toBe('Coligada inválida');
   });
 

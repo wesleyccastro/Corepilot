@@ -5,7 +5,11 @@ import type { TenantContext } from '../auth/tenant-context';
 describe('ConsultaController', () => {
   function buildTenantContext(): TenantContext {
     return {
-      get: () => ({ usuarioId: 'usuario-1', empresaId: 'empresa-1', perfil: 'admin' as const }),
+      get: () => ({
+        usuarioId: 'usuario-1',
+        empresaId: 'empresa-1',
+        perfil: 'admin' as const,
+      }),
     } as unknown as TenantContext;
   }
 
@@ -14,7 +18,9 @@ describe('ConsultaController', () => {
     nome: 'Saldo de estoque',
     codSentenca: 'SALDOESTOQUEINSU',
     parametrosSincronizacao: { CODFILIAL: '001' },
-    camposFiltro: [{ nome: 'codProduto', tipo: 'string' as const, obrigatorio: true }],
+    camposFiltro: [
+      { nome: 'codProduto', tipo: 'string' as const, obrigatorio: true },
+    ],
   };
 
   it('cria uma consulta no módulo informado, na empresa do tenant atual', async () => {
@@ -33,9 +39,9 @@ describe('ConsultaController', () => {
     const service = { create: jest.fn() } as unknown as ConsultaService;
     const controller = new ConsultaController(service, buildTenantContext());
 
-    await expect(controller.criar('modulo-1', { ...dto, codSentenca: '' })).rejects.toThrow(
-      'nome, codSentenca e fonteDeDadosId são obrigatórios',
-    );
+    await expect(
+      controller.criar('modulo-1', { ...dto, codSentenca: '' }),
+    ).rejects.toThrow('nome, codSentenca e fonteDeDadosId são obrigatórios');
     expect(service.create).not.toHaveBeenCalled();
   });
 
@@ -47,7 +53,10 @@ describe('ConsultaController', () => {
 
     const resultado = await controller.listar('modulo-1');
 
-    expect(service.findAllByModulo).toHaveBeenCalledWith('modulo-1', 'empresa-1');
+    expect(service.findAllByModulo).toHaveBeenCalledWith(
+      'modulo-1',
+      'empresa-1',
+    );
     expect(resultado).toEqual([{ id: 'consulta-1' }]);
   });
 
@@ -64,7 +73,12 @@ describe('ConsultaController', () => {
       intervaloMinutos: 60,
     });
 
-    expect(service.atualizarSincronizacao).toHaveBeenCalledWith('consulta-1', 'empresa-1', true, 60);
+    expect(service.atualizarSincronizacao).toHaveBeenCalledWith(
+      'consulta-1',
+      'empresa-1',
+      true,
+      60,
+    );
     expect(resultado).toEqual({ id: 'consulta-1', sincronizacaoAtiva: true });
   });
 });

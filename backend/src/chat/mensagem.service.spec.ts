@@ -26,7 +26,9 @@ describe('MensagemService', () => {
 
   it('appendUserMessage grava com papel usuario', async () => {
     const prisma = buildPrismaMock();
-    (prisma.mensagem.create as jest.Mock).mockResolvedValue({ id: 'mensagem-1' });
+    (prisma.mensagem.create as jest.Mock).mockResolvedValue({
+      id: 'mensagem-1',
+    });
     const service = new MensagemService(prisma);
 
     await service.appendUserMessage('conversa-1', 'Olá');
@@ -38,7 +40,9 @@ describe('MensagemService', () => {
 
   it('appendAgentMessage grava com papel agente e os tokens informados', async () => {
     const prisma = buildPrismaMock();
-    (prisma.mensagem.create as jest.Mock).mockResolvedValue({ id: 'mensagem-2' });
+    (prisma.mensagem.create as jest.Mock).mockResolvedValue({
+      id: 'mensagem-2',
+    });
     const service = new MensagemService(prisma);
 
     await service.appendAgentMessage('conversa-1', 'Oi, tudo bem?', 10, 20);

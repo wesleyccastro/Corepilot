@@ -118,7 +118,7 @@ export class FluxoController {
         fluxoId: fluxo.id,
         moduloId,
         versao: fluxo.versao,
-      } as unknown as Prisma.InputJsonValue,
+      },
     });
     return fluxo;
   }

@@ -23,9 +23,11 @@ describe('MeController', () => {
         }),
       },
       empresa: {
-        findUniqueOrThrow: jest
-          .fn()
-          .mockResolvedValue({ id: 'empresa-1', nome: 'Empresa A', razaoSocial: null }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          id: 'empresa-1',
+          nome: 'Empresa A',
+          razaoSocial: null,
+        }),
       },
     } as unknown as PrismaService;
 
@@ -47,7 +49,12 @@ describe('MeController', () => {
 
     expect(resultado).toEqual({
       usuario: { id: 'usuario-1', nome: 'Ana', email: 'ana@empresa-a.com' },
-      empresa: { id: 'empresa-1', nome: 'Empresa A', razaoSocial: null, logoDataUrl: null },
+      empresa: {
+        id: 'empresa-1',
+        nome: 'Empresa A',
+        razaoSocial: null,
+        logoDataUrl: null,
+      },
       perfil: 'admin',
     });
     expect(record).toHaveBeenCalledWith(

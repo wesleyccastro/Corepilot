@@ -17,7 +17,12 @@ export interface ConsultaComFonte {
 }
 
 export type ResultadoSincronizacao =
-  | { sucesso: true; linhasLidas: number; colunas: ColunaDescrita[]; amostra: Record<string, string>[] }
+  | {
+      sucesso: true;
+      linhasLidas: number;
+      colunas: ColunaDescrita[];
+      amostra: Record<string, string>[];
+    }
   | { sucesso: false; erro: string };
 
 @Injectable()
@@ -28,8 +33,11 @@ export class ConsultaSincronizacaoService {
     private readonly totvsRmAdapter: TotvsRmAdapterService,
   ) {}
 
-  async executarSincronizacao(consulta: ConsultaComFonte): Promise<ResultadoSincronizacao> {
-    const configuracao = consulta.fonteDeDados.configuracao as ConfiguracaoFonteDeDados;
+  async executarSincronizacao(
+    consulta: ConsultaComFonte,
+  ): Promise<ResultadoSincronizacao> {
+    const configuracao = consulta.fonteDeDados
+      .configuracao as ConfiguracaoFonteDeDados;
     const chave = this.config.getOrThrow<string>('ERP_ENCRYPTION_KEY');
 
     const conexao = {
@@ -55,12 +63,16 @@ export class ConsultaSincronizacaoService {
           ultimoResultadoSincronizacao: {
             sucesso: false,
             erro: mensagem,
-          } as unknown as Prisma.InputJsonValue,
+          },
         },
       });
       await this.prisma.fonteDeDados.update({
         where: { id: consulta.fonteDeDadosId },
-        data: { ultimoTesteEm: new Date(), ultimoTesteSucesso: false, ultimaMensagemErro: mensagem },
+        data: {
+          ultimoTesteEm: new Date(),
+          ultimoTesteSucesso: false,
+          ultimaMensagemErro: mensagem,
+        },
       });
       return { sucesso: false, erro: mensagem };
     }
@@ -77,7 +89,7 @@ export class ConsultaSincronizacaoService {
       await this.prisma.consultaResultado.createMany({
         data: linhas.map((linha) => ({
           consultaParametrizadaId: consulta.id,
-          dados: linha as unknown as Prisma.InputJsonValue,
+          dados: linha,
         })),
       });
     }
@@ -91,12 +103,16 @@ export class ConsultaSincronizacaoService {
         ultimoResultadoSincronizacao: {
           sucesso: true,
           linhasLidas: linhas.length,
-        } as unknown as Prisma.InputJsonValue,
+        },
       },
     });
     await this.prisma.fonteDeDados.update({
       where: { id: consulta.fonteDeDadosId },
-      data: { ultimoTesteEm: new Date(), ultimoTesteSucesso: true, ultimaMensagemErro: null },
+      data: {
+        ultimoTesteEm: new Date(),
+        ultimoTesteSucesso: true,
+        ultimaMensagemErro: null,
+      },
     });
 
     return {

@@ -7,7 +7,9 @@ export function decodificarXml(xml: string): string {
     .replace(/&apos;/g, "'");
 }
 
-export function extrairResultados(xmlDecodificado: string): Record<string, string>[] {
+export function extrairResultados(
+  xmlDecodificado: string,
+): Record<string, string>[] {
   const linhas: Record<string, string>[] = [];
   const padraoLinha = /<Resultado>([\s\S]*?)<\/Resultado>/g;
 

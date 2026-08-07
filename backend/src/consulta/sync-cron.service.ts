@@ -21,14 +21,20 @@ export class SyncCronService {
     });
 
     const devidas = consultasAtivas.filter((consulta) =>
-      estaDevida(consulta.ultimaSincronizacaoEm, consulta.intervaloSincronizacaoMinutos),
+      estaDevida(
+        consulta.ultimaSincronizacaoEm,
+        consulta.intervaloSincronizacaoMinutos,
+      ),
     );
 
     for (const consulta of devidas) {
       try {
         await this.consultaSincronizacaoService.executarSincronizacao(consulta);
       } catch (erro) {
-        this.logger.error(`Falha inesperada ao sincronizar consulta ${consulta.id}`, erro);
+        this.logger.error(
+          `Falha inesperada ao sincronizar consulta ${consulta.id}`,
+          erro,
+        );
       }
     }
   }

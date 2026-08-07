@@ -27,7 +27,10 @@ describe('AnthropicService', () => {
   });
 
   it('chama client.messages.parse com os parâmetros corretos', async () => {
-    const respostaFalsa = { parsed_output: { titulo: 'ok' }, usage: { input_tokens: 10, output_tokens: 5 } };
+    const respostaFalsa = {
+      parsed_output: { titulo: 'ok' },
+      usage: { input_tokens: 10, output_tokens: 5 },
+    };
     const client = {
       messages: { parse: jest.fn().mockResolvedValue(respostaFalsa) },
     } as unknown as Anthropic;
@@ -60,7 +63,11 @@ describe('AnthropicService', () => {
     } as unknown as Anthropic;
     const service = new AnthropicService(client);
     const tools = [
-      { name: 'consulta_1', description: 'x', input_schema: { type: 'object' as const, properties: {}, required: [] } },
+      {
+        name: 'consulta_1',
+        description: 'x',
+        input_schema: { type: 'object' as const, properties: {}, required: [] },
+      },
     ];
 
     const resultado = await service.createWithTools({
@@ -83,7 +90,10 @@ describe('AnthropicService', () => {
   });
 
   it('parseStructuredFromHistory chama client.messages.parse com o histórico completo', async () => {
-    const respostaFalsa = { parsed_output: { titulo: 'ok' }, usage: { input_tokens: 20, output_tokens: 8 } };
+    const respostaFalsa = {
+      parsed_output: { titulo: 'ok' },
+      usage: { input_tokens: 20, output_tokens: 8 },
+    };
     const client = {
       messages: { parse: jest.fn().mockResolvedValue(respostaFalsa) },
     } as unknown as Anthropic;

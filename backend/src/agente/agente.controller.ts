@@ -95,7 +95,10 @@ export class AgenteController {
     @Body() body: RascunharGuardrailsDto,
   ) {
     const { usuarioId, empresaId } = this.tenantContext.get();
-    const agente = await this.agenteService.findByIdInEmpresa(agenteId, empresaId);
+    const agente = await this.agenteService.findByIdInEmpresa(
+      agenteId,
+      empresaId,
+    );
 
     const system =
       'Você ajuda a definir restrições de segurança e regras de escalonamento para agentes de IA corporativos dentro do CorePilot.';
@@ -118,7 +121,9 @@ export class AgenteController {
     });
 
     if (!response.parsed_output) {
-      throw new UnprocessableEntityException('A resposta da IA não pôde ser validada');
+      throw new UnprocessableEntityException(
+        'A resposta da IA não pôde ser validada',
+      );
     }
 
     await this.audit.record({
@@ -143,18 +148,25 @@ export class AgenteController {
     @Body() body: RascunharSkillDto,
   ) {
     if (!body.brief?.trim() && !body.skillObjetivo?.trim()) {
-      throw new BadRequestException('Informe o objetivo da skill ou descreva o que você precisa');
+      throw new BadRequestException(
+        'Informe o objetivo da skill ou descreva o que você precisa',
+      );
     }
 
     const { usuarioId, empresaId } = this.tenantContext.get();
-    const agente = await this.agenteService.findByIdInEmpresa(agenteId, empresaId);
+    const agente = await this.agenteService.findByIdInEmpresa(
+      agenteId,
+      empresaId,
+    );
 
     const system =
       'Você ajuda a definir o contrato de saída (campos estruturados) de uma skill de agente de IA dentro do CorePilot. Os tipos disponíveis são apenas: string, number, boolean, string[].';
     const mensagem = [
       `Agente: "${agente.nome}" (${agente.funcao})`,
       body.skillNome?.trim() ? `Nome da skill: ${body.skillNome.trim()}` : null,
-      body.skillObjetivo?.trim() ? `Objetivo da skill: ${body.skillObjetivo.trim()}` : null,
+      body.skillObjetivo?.trim()
+        ? `Objetivo da skill: ${body.skillObjetivo.trim()}`
+        : null,
       body.brief?.trim() ? `O que o usuário pediu: ${body.brief.trim()}` : null,
       '',
       'Defina de 2 a 6 campos de saída estruturados que essa skill deve retornar, cada um com nome (em snake_case), tipo, se é obrigatório, e uma descrição curta.',
@@ -171,7 +183,9 @@ export class AgenteController {
     });
 
     if (!response.parsed_output) {
-      throw new UnprocessableEntityException('A resposta da IA não pôde ser validada');
+      throw new UnprocessableEntityException(
+        'A resposta da IA não pôde ser validada',
+      );
     }
 
     await this.audit.record({

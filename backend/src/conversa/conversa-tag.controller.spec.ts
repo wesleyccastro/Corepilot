@@ -6,7 +6,11 @@ import type { TenantContext } from '../auth/tenant-context';
 describe('ConversaTagController', () => {
   function buildTenantContext(): TenantContext {
     return {
-      get: () => ({ usuarioId: 'usuario-1', empresaId: 'empresa-1', perfil: 'admin' as const }),
+      get: () => ({
+        usuarioId: 'usuario-1',
+        empresaId: 'empresa-1',
+        perfil: 'admin' as const,
+      }),
     } as unknown as TenantContext;
   }
 
@@ -18,7 +22,11 @@ describe('ConversaTagController', () => {
 
     const resultado = await controller.criar('modulo-1', { nome: 'Cotações' });
 
-    expect(service.create).toHaveBeenCalledWith('modulo-1', 'empresa-1', 'Cotações');
+    expect(service.create).toHaveBeenCalledWith(
+      'modulo-1',
+      'empresa-1',
+      'Cotações',
+    );
     expect(resultado).toEqual({ id: 'tag-1', nome: 'Cotações' });
   });
 
@@ -26,7 +34,9 @@ describe('ConversaTagController', () => {
     const service = { create: jest.fn() } as unknown as ConversaTagService;
     const controller = new ConversaTagController(service, buildTenantContext());
 
-    await expect(controller.criar('modulo-1', { nome: '  ' })).rejects.toThrow(BadRequestException);
+    await expect(controller.criar('modulo-1', { nome: '  ' })).rejects.toThrow(
+      BadRequestException,
+    );
     expect(service.create).not.toHaveBeenCalled();
   });
 
@@ -38,7 +48,10 @@ describe('ConversaTagController', () => {
 
     const resultado = await controller.listar('modulo-1');
 
-    expect(service.findAllByModulo).toHaveBeenCalledWith('modulo-1', 'empresa-1');
+    expect(service.findAllByModulo).toHaveBeenCalledWith(
+      'modulo-1',
+      'empresa-1',
+    );
     expect(resultado).toEqual([{ id: 'tag-1' }]);
   });
 

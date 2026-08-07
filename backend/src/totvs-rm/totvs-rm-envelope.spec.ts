@@ -1,4 +1,8 @@
-import { formatarParametros, montarAuthHeader, montarEnvelopeConsultaSQL } from './totvs-rm-envelope';
+import {
+  formatarParametros,
+  montarAuthHeader,
+  montarEnvelopeConsultaSQL,
+} from './totvs-rm-envelope';
 
 describe('totvs-rm-envelope', () => {
   const conexao = {
@@ -20,16 +24,24 @@ describe('totvs-rm-envelope', () => {
   });
 
   it('monta o envelope SOAP com AutenticacaoHeader e RealizarConsultaSQL', () => {
-    const envelope = montarEnvelopeConsultaSQL(conexao, 'SALDOESTOQUEINSU', { CODFILIAL: '001' });
+    const envelope = montarEnvelopeConsultaSQL(conexao, 'SALDOESTOQUEINSU', {
+      CODFILIAL: '001',
+    });
 
     expect(envelope).toContain('<tot:Chave>admin|segredo|T|1</tot:Chave>');
-    expect(envelope).toContain('<tot:codSentenca>SALDOESTOQUEINSU</tot:codSentenca>');
+    expect(envelope).toContain(
+      '<tot:codSentenca>SALDOESTOQUEINSU</tot:codSentenca>',
+    );
     expect(envelope).toContain('<tot:codColigada>1</tot:codColigada>');
-    expect(envelope).toContain('<tot:parameters>CODFILIAL=001</tot:parameters>');
+    expect(envelope).toContain(
+      '<tot:parameters>CODFILIAL=001</tot:parameters>',
+    );
   });
 
   it('monta o header de HTTP Basic Auth', () => {
     const header = montarAuthHeader(conexao);
-    expect(header).toBe('Basic ' + Buffer.from('admin:segredo').toString('base64'));
+    expect(header).toBe(
+      'Basic ' + Buffer.from('admin:segredo').toString('base64'),
+    );
   });
 });

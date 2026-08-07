@@ -6,7 +6,11 @@ import type { TenantContext } from '../auth/tenant-context';
 describe('FonteDeDadosController', () => {
   function buildTenantContext(): TenantContext {
     return {
-      get: () => ({ usuarioId: 'usuario-1', empresaId: 'empresa-1', perfil: 'admin' as const }),
+      get: () => ({
+        usuarioId: 'usuario-1',
+        empresaId: 'empresa-1',
+        perfil: 'admin' as const,
+      }),
     } as unknown as TenantContext;
   }
 
@@ -37,7 +41,11 @@ describe('FonteDeDadosController', () => {
         },
       }),
     } as unknown as FonteDeDadosService;
-    const controller = new FonteDeDadosController(service, buildAudit(), buildTenantContext());
+    const controller = new FonteDeDadosController(
+      service,
+      buildAudit(),
+      buildTenantContext(),
+    );
 
     const resultado = await controller.criar(dtoValido);
 
@@ -47,7 +55,11 @@ describe('FonteDeDadosController', () => {
 
   it('rejeita quando falta um campo obrigatório', async () => {
     const service = { create: jest.fn() } as unknown as FonteDeDadosService;
-    const controller = new FonteDeDadosController(service, buildAudit(), buildTenantContext());
+    const controller = new FonteDeDadosController(
+      service,
+      buildAudit(),
+      buildTenantContext(),
+    );
 
     await expect(controller.criar({ ...dtoValido, senha: '' })).rejects.toThrow(
       'tipo, nome, serverUrl, username, senha, codSistema e codColigada são obrigatórios',
@@ -70,7 +82,11 @@ describe('FonteDeDadosController', () => {
         },
       ]),
     } as unknown as FonteDeDadosService;
-    const controller = new FonteDeDadosController(service, buildAudit(), buildTenantContext());
+    const controller = new FonteDeDadosController(
+      service,
+      buildAudit(),
+      buildTenantContext(),
+    );
 
     const resultado = await controller.listar();
 
@@ -93,11 +109,21 @@ describe('FonteDeDadosController', () => {
         }),
       } as unknown as FonteDeDadosService;
       const audit = buildAudit();
-      const controller = new FonteDeDadosController(service, audit, buildTenantContext());
+      const controller = new FonteDeDadosController(
+        service,
+        audit,
+        buildTenantContext(),
+      );
 
-      const resultado = await controller.atualizar('fonte-1', { nome: 'RM Novo', senha: 'nova-senha' });
+      const resultado = await controller.atualizar('fonte-1', {
+        nome: 'RM Novo',
+        senha: 'nova-senha',
+      });
 
-      expect(service.update).toHaveBeenCalledWith('fonte-1', 'empresa-1', { nome: 'RM Novo', senha: 'nova-senha' });
+      expect(service.update).toHaveBeenCalledWith('fonte-1', 'empresa-1', {
+        nome: 'RM Novo',
+        senha: 'nova-senha',
+      });
       expect(resultado.configuracao).not.toHaveProperty('senhaCriptografada');
       expect(audit.record).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -106,7 +132,8 @@ describe('FonteDeDadosController', () => {
           acao: 'fonte_de_dados_atualizada',
         }),
       );
-      const dadosDepois = (audit.record as jest.Mock).mock.calls[0][0].dadosDepois as Record<string, unknown>;
+      const dadosDepois = (audit.record as jest.Mock).mock.calls[0][0]
+        .dadosDepois as Record<string, unknown>;
       expect(dadosDepois).not.toHaveProperty('senha');
       expect(JSON.stringify(dadosDepois)).not.toContain('nova-senha');
       expect(dadosDepois.senhaAlterada).toBe(true);

@@ -25,7 +25,9 @@ export class ConversaTagService {
   }
 
   async remove(tagId: string, empresaId: string) {
-    const tag = await this.prisma.conversaTag.findFirst({ where: { id: tagId, empresaId } });
+    const tag = await this.prisma.conversaTag.findFirst({
+      where: { id: tagId, empresaId },
+    });
 
     if (!tag) {
       throw new NotFoundException('Tag não encontrada');

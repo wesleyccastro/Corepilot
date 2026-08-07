@@ -1,7 +1,11 @@
 import { EvolutionApiAdapterService } from './evolution-api-adapter.service';
 
 describe('EvolutionApiAdapterService', () => {
-  const conexao = { apiUrl: 'https://evolution.exemplo.com', instanceName: 'corepilot', apiKey: 'chave-123' };
+  const conexao = {
+    apiUrl: 'https://evolution.exemplo.com',
+    instanceName: 'corepilot',
+    apiKey: 'chave-123',
+  };
 
   afterEach(() => {
     jest.restoreAllMocks();
@@ -39,7 +43,9 @@ describe('EvolutionApiAdapterService', () => {
     jest.spyOn(global, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'));
     const adapter = new EvolutionApiAdapterService();
 
-    await expect(adapter.testarConexao(conexao)).rejects.toThrow('Evolution API inacessível');
+    await expect(adapter.testarConexao(conexao)).rejects.toThrow(
+      'Evolution API inacessível',
+    );
   });
 
   it('enviarMensagem envia number/text e devolve o messageId', async () => {
@@ -49,7 +55,11 @@ describe('EvolutionApiAdapterService', () => {
     } as Response);
     const adapter = new EvolutionApiAdapterService();
 
-    const resultado = await adapter.enviarMensagem(conexao, '+5511999999999', 'Olá!');
+    const resultado = await adapter.enviarMensagem(
+      conexao,
+      '+5511999999999',
+      'Olá!',
+    );
 
     expect(resultado).toEqual({ messageId: 'msg-abc' });
     expect(global.fetch).toHaveBeenCalledWith(
@@ -63,9 +73,15 @@ describe('EvolutionApiAdapterService', () => {
   });
 
   it('enviarMensagem lança erro quando a Evolution API rejeita o envio', async () => {
-    jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 400, text: () => Promise.resolve('número inválido') } as Response);
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: () => Promise.resolve('número inválido'),
+    } as Response);
     const adapter = new EvolutionApiAdapterService();
 
-    await expect(adapter.enviarMensagem(conexao, 'x', 'y')).rejects.toThrow('Evolution API rejeitou o envio');
+    await expect(adapter.enviarMensagem(conexao, 'x', 'y')).rejects.toThrow(
+      'Evolution API rejeitou o envio',
+    );
   });
 });

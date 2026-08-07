@@ -88,9 +88,9 @@ describe('ModuloService', () => {
     (prisma.modulo.findFirst as jest.Mock).mockResolvedValue(null);
     const service = new ModuloService(prisma);
 
-    await expect(service.findByIdInEmpresa('modulo-x', 'empresa-1')).rejects.toThrow(
-      NotFoundException,
-    );
+    await expect(
+      service.findByIdInEmpresa('modulo-x', 'empresa-1'),
+    ).rejects.toThrow(NotFoundException);
     expect(prisma.modulo.findFirst).toHaveBeenCalledWith({
       where: { id: 'modulo-x', empresaId: 'empresa-1' },
     });
@@ -109,13 +109,23 @@ describe('ModuloService', () => {
 
   it('update atualiza só os campos informados, escopado à empresa', async () => {
     const prisma = buildPrismaMock();
-    (prisma.modulo.findFirst as jest.Mock).mockResolvedValue({ id: 'modulo-1', empresaId: 'empresa-1' });
-    (prisma.modulo.update as jest.Mock).mockResolvedValue({ id: 'modulo-1', nome: 'Novo nome' });
+    (prisma.modulo.findFirst as jest.Mock).mockResolvedValue({
+      id: 'modulo-1',
+      empresaId: 'empresa-1',
+    });
+    (prisma.modulo.update as jest.Mock).mockResolvedValue({
+      id: 'modulo-1',
+      nome: 'Novo nome',
+    });
     const service = new ModuloService(prisma);
 
-    const resultado = await service.update('modulo-1', 'empresa-1', { nome: 'Novo nome' });
+    const resultado = await service.update('modulo-1', 'empresa-1', {
+      nome: 'Novo nome',
+    });
 
-    expect(prisma.modulo.findFirst).toHaveBeenCalledWith({ where: { id: 'modulo-1', empresaId: 'empresa-1' } });
+    expect(prisma.modulo.findFirst).toHaveBeenCalledWith({
+      where: { id: 'modulo-1', empresaId: 'empresa-1' },
+    });
     expect(prisma.modulo.update).toHaveBeenCalledWith({
       where: { id: 'modulo-1' },
       data: { nome: 'Novo nome' },
@@ -125,11 +135,19 @@ describe('ModuloService', () => {
 
   it('update permite desativar/ativar o módulo via campo ativo', async () => {
     const prisma = buildPrismaMock();
-    (prisma.modulo.findFirst as jest.Mock).mockResolvedValue({ id: 'modulo-1', empresaId: 'empresa-1' });
-    (prisma.modulo.update as jest.Mock).mockResolvedValue({ id: 'modulo-1', ativo: false });
+    (prisma.modulo.findFirst as jest.Mock).mockResolvedValue({
+      id: 'modulo-1',
+      empresaId: 'empresa-1',
+    });
+    (prisma.modulo.update as jest.Mock).mockResolvedValue({
+      id: 'modulo-1',
+      ativo: false,
+    });
     const service = new ModuloService(prisma);
 
-    const resultado = await service.update('modulo-1', 'empresa-1', { ativo: false });
+    const resultado = await service.update('modulo-1', 'empresa-1', {
+      ativo: false,
+    });
 
     expect(prisma.modulo.update).toHaveBeenCalledWith({
       where: { id: 'modulo-1' },
@@ -143,7 +161,9 @@ describe('ModuloService', () => {
     (prisma.modulo.findFirst as jest.Mock).mockResolvedValue(null);
     const service = new ModuloService(prisma);
 
-    await expect(service.update('modulo-x', 'empresa-1', { nome: 'X' })).rejects.toThrow(NotFoundException);
+    await expect(
+      service.update('modulo-x', 'empresa-1', { nome: 'X' }),
+    ).rejects.toThrow(NotFoundException);
     expect(prisma.modulo.update).not.toHaveBeenCalled();
   });
 });

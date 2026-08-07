@@ -3,7 +3,9 @@ import { EmpresaService } from './empresa.service';
 import type { PrismaService } from '../prisma/prisma.service';
 
 describe('EmpresaService', () => {
-  function buildArquivo(overrides: Partial<Express.Multer.File> = {}): Express.Multer.File {
+  function buildArquivo(
+    overrides: Partial<Express.Multer.File> = {},
+  ): Express.Multer.File {
     return {
       buffer: Buffer.from('fake-image-bytes'),
       mimetype: 'image/png',
@@ -57,7 +59,10 @@ describe('EmpresaService', () => {
     const service = new EmpresaService({} as PrismaService);
 
     await expect(
-      service.atualizarLogo('empresa-1', buildArquivo({ mimetype: 'application/pdf' })),
+      service.atualizarLogo(
+        'empresa-1',
+        buildArquivo({ mimetype: 'application/pdf' }),
+      ),
     ).rejects.toThrow(BadRequestException);
   });
 
@@ -65,7 +70,10 @@ describe('EmpresaService', () => {
     const service = new EmpresaService({} as PrismaService);
 
     await expect(
-      service.atualizarLogo('empresa-1', buildArquivo({ size: 3 * 1024 * 1024 })),
+      service.atualizarLogo(
+        'empresa-1',
+        buildArquivo({ size: 3 * 1024 * 1024 }),
+      ),
     ).rejects.toThrow(BadRequestException);
   });
 
@@ -144,8 +152,8 @@ describe('EmpresaService', () => {
   it('rejeita nome vazio', async () => {
     const service = new EmpresaService({} as PrismaService);
 
-    await expect(service.atualizarDados('empresa-1', { nome: '   ' })).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(
+      service.atualizarDados('empresa-1', { nome: '   ' }),
+    ).rejects.toThrow(BadRequestException);
   });
 });

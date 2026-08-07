@@ -1,4 +1,13 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TenantGuard } from '../auth/tenant.guard';
 import { TenantContext } from '../auth/tenant-context';
@@ -19,9 +28,18 @@ export class ConsultaController {
   ) {}
 
   @Post('modulos/:moduloId/consultas')
-  async criar(@Param('moduloId') moduloId: string, @Body() body: CreateConsultaDto) {
-    if (!body.nome?.trim() || !body.codSentenca?.trim() || !body.fonteDeDadosId?.trim()) {
-      throw new BadRequestException('nome, codSentenca e fonteDeDadosId são obrigatórios');
+  async criar(
+    @Param('moduloId') moduloId: string,
+    @Body() body: CreateConsultaDto,
+  ) {
+    if (
+      !body.nome?.trim() ||
+      !body.codSentenca?.trim() ||
+      !body.fonteDeDadosId?.trim()
+    ) {
+      throw new BadRequestException(
+        'nome, codSentenca e fonteDeDadosId são obrigatórios',
+      );
     }
 
     const { empresaId } = this.tenantContext.get();

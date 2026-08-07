@@ -4,7 +4,11 @@ import request from 'supertest';
 import type { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { createTestUser, deleteTestUser, signInTestUser } from '../src/testing/supabase-admin.helper';
+import {
+  createTestUser,
+  deleteTestUser,
+  signInTestUser,
+} from '../src/testing/supabase-admin.helper';
 import { provisionUsuarioParaEmpresa } from '../src/testing/provision-usuario.helper';
 
 jest.setTimeout(30000);
@@ -16,7 +20,9 @@ describe('Fluxo de chat (módulo real + Anthropic real + isolamento entre tenant
   const empresaIdsParaLimpar: string[] = [];
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
     app = moduleRef.createNestApplication();
     await app.init();
     prisma = app.get(PrismaService);
@@ -24,47 +30,68 @@ describe('Fluxo de chat (módulo real + Anthropic real + isolamento entre tenant
 
   afterAll(async () => {
     try {
-      await prisma.mensagem.deleteMany({ where: { conversa: { empresaId: { in: empresaIdsParaLimpar } } } });
+      await prisma.mensagem.deleteMany({
+        where: { conversa: { empresaId: { in: empresaIdsParaLimpar } } },
+      });
     } catch (erro) {
       console.warn('Falha ao limpar mensagens de teste', erro);
     }
     try {
-      await prisma.conversa.deleteMany({ where: { empresaId: { in: empresaIdsParaLimpar } } });
+      await prisma.conversa.deleteMany({
+        where: { empresaId: { in: empresaIdsParaLimpar } },
+      });
     } catch (erro) {
       console.warn('Falha ao limpar conversas de teste', erro);
     }
     try {
-      await prisma.modulo.deleteMany({ where: { empresaId: { in: empresaIdsParaLimpar } } });
+      await prisma.modulo.deleteMany({
+        where: { empresaId: { in: empresaIdsParaLimpar } },
+      });
     } catch (erro) {
       console.warn('Falha ao limpar módulos de teste', erro);
     }
     try {
-      await prisma.auditLog.deleteMany({ where: { empresaId: { in: empresaIdsParaLimpar } } });
+      await prisma.auditLog.deleteMany({
+        where: { empresaId: { in: empresaIdsParaLimpar } },
+      });
     } catch (erro) {
       console.warn('Falha ao limpar audit logs de teste', erro);
     }
     try {
-      await prisma.usuarioEmpresa.deleteMany({ where: { empresaId: { in: empresaIdsParaLimpar } } });
+      await prisma.usuarioEmpresa.deleteMany({
+        where: { empresaId: { in: empresaIdsParaLimpar } },
+      });
     } catch (erro) {
       console.warn('Falha ao limpar vínculos usuário-empresa de teste', erro);
     }
     try {
-      await prisma.usuario.deleteMany({ where: { supabaseUserId: { in: authUserIdsParaLimpar } } });
+      await prisma.usuario.deleteMany({
+        where: { supabaseUserId: { in: authUserIdsParaLimpar } },
+      });
     } catch (erro) {
       console.warn('Falha ao limpar usuários de teste', erro);
     }
     try {
-      await prisma.empresa.deleteMany({ where: { id: { in: empresaIdsParaLimpar } } });
+      await prisma.empresa.deleteMany({
+        where: { id: { in: empresaIdsParaLimpar } },
+      });
     } catch (erro) {
       console.warn('Falha ao limpar empresas de teste', erro);
     }
 
-    await Promise.allSettled(authUserIdsParaLimpar.map((userId) => deleteTestUser(userId)));
+    await Promise.allSettled(
+      authUserIdsParaLimpar.map((userId) => deleteTestUser(userId)),
+    );
     await app.close();
   });
 
-  async function criarEmpresaComUsuarioLogado(nomeEmpresa: string, email: string) {
-    const empresa = await prisma.empresa.create({ data: { nome: nomeEmpresa } });
+  async function criarEmpresaComUsuarioLogado(
+    nomeEmpresa: string,
+    email: string,
+  ) {
+    const empresa = await prisma.empresa.create({
+      data: { nome: nomeEmpresa },
+    });
     empresaIdsParaLimpar.push(empresa.id);
 
     const password = 'TesteFase2!23';
@@ -93,8 +120,14 @@ describe('Fluxo de chat (módulo real + Anthropic real + isolamento entre tenant
 
   it('cria módulo/conversa reais, envia mensagem real à Anthropic, persiste e audita — e nunca vaza entre empresas', async () => {
     const sufixo = Date.now();
-    const empresaA = await criarEmpresaComUsuarioLogado('E2E Chat Empresa A', `e2e-chat-a-${sufixo}@corepilot.dev`);
-    const empresaB = await criarEmpresaComUsuarioLogado('E2E Chat Empresa B', `e2e-chat-b-${sufixo}@corepilot.dev`);
+    const empresaA = await criarEmpresaComUsuarioLogado(
+      'E2E Chat Empresa A',
+      `e2e-chat-a-${sufixo}@corepilot.dev`,
+    );
+    const empresaB = await criarEmpresaComUsuarioLogado(
+      'E2E Chat Empresa B',
+      `e2e-chat-b-${sufixo}@corepilot.dev`,
+    );
 
     const moduloRespostaA = await request(app.getHttpServer())
       .post('/modulos')
@@ -121,13 +154,19 @@ describe('Fluxo de chat (módulo real + Anthropic real + isolamento entre tenant
     expect(eventoFinal).toBeDefined();
     expect(typeof eventoFinal?.mensagemId).toBe('string');
 
-    const mensagensSalvas = await prisma.mensagem.findMany({ where: { conversaId } });
+    const mensagensSalvas = await prisma.mensagem.findMany({
+      where: { conversaId },
+    });
     expect(mensagensSalvas).toHaveLength(2);
     expect(mensagensSalvas.some((m) => m.papel === 'usuario')).toBe(true);
     expect(mensagensSalvas.some((m) => m.papel === 'agente')).toBe(true);
 
-    const auditLogs = await prisma.auditLog.findMany({ where: { empresaId: empresaA.empresa.id } });
-    expect(auditLogs.filter((log) => log.acao === 'chat_mensagem')).toHaveLength(1);
+    const auditLogs = await prisma.auditLog.findMany({
+      where: { empresaId: empresaA.empresa.id },
+    });
+    expect(
+      auditLogs.filter((log) => log.acao === 'chat_mensagem'),
+    ).toHaveLength(1);
 
     // Isolamento: o usuário da empresa B não consegue acessar o módulo/conversa da empresa A
     await request(app.getHttpServer())
@@ -145,6 +184,10 @@ describe('Fluxo de chat (módulo real + Anthropic real + isolamento entre tenant
       .get('/modulos')
       .set('Authorization', `Bearer ${empresaB.accessToken}`)
       .expect(200);
-    expect((listaModulosB.body as Array<{ id: string }>).some((m) => m.id === moduloId)).toBe(false);
+    expect(
+      (listaModulosB.body as Array<{ id: string }>).some(
+        (m) => m.id === moduloId,
+      ),
+    ).toBe(false);
   });
 });

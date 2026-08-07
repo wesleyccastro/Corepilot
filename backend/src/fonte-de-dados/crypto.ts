@@ -13,7 +13,10 @@ export function criptografar(texto: string, chaveHex: string): string {
   return `${iv.toString('hex')}:${authTag.toString('hex')}:${cifrado.toString('hex')}`;
 }
 
-export function descriptografar(textoCriptografado: string, chaveHex: string): string {
+export function descriptografar(
+  textoCriptografado: string,
+  chaveHex: string,
+): string {
   const [ivHex, authTagHex, cifradoHex] = textoCriptografado.split(':');
   const chave = Buffer.from(chaveHex, 'hex');
   const iv = Buffer.from(ivHex, 'hex');

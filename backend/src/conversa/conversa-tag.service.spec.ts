@@ -21,13 +21,21 @@ describe('ConversaTagService', () => {
 
   it('cria uma tag depois de validar que o módulo é da empresa', async () => {
     const { prisma, moduloService } = buildDeps();
-    (moduloService.findByIdInEmpresa as jest.Mock).mockResolvedValue({ id: 'modulo-1' });
-    (prisma.conversaTag.create as jest.Mock).mockResolvedValue({ id: 'tag-1', nome: 'Cotações' });
+    (moduloService.findByIdInEmpresa as jest.Mock).mockResolvedValue({
+      id: 'modulo-1',
+    });
+    (prisma.conversaTag.create as jest.Mock).mockResolvedValue({
+      id: 'tag-1',
+      nome: 'Cotações',
+    });
     const service = new ConversaTagService(prisma, moduloService);
 
     const resultado = await service.create('modulo-1', 'empresa-1', 'Cotações');
 
-    expect(moduloService.findByIdInEmpresa).toHaveBeenCalledWith('modulo-1', 'empresa-1');
+    expect(moduloService.findByIdInEmpresa).toHaveBeenCalledWith(
+      'modulo-1',
+      'empresa-1',
+    );
     expect(prisma.conversaTag.create).toHaveBeenCalledWith({
       data: { moduloId: 'modulo-1', empresaId: 'empresa-1', nome: 'Cotações' },
     });
@@ -49,13 +57,20 @@ describe('ConversaTagService', () => {
 
   it('remove uma tag depois de confirmar que é da empresa', async () => {
     const { prisma, moduloService } = buildDeps();
-    (prisma.conversaTag.findFirst as jest.Mock).mockResolvedValue({ id: 'tag-1', empresaId: 'empresa-1' });
+    (prisma.conversaTag.findFirst as jest.Mock).mockResolvedValue({
+      id: 'tag-1',
+      empresaId: 'empresa-1',
+    });
     const service = new ConversaTagService(prisma, moduloService);
 
     await service.remove('tag-1', 'empresa-1');
 
-    expect(prisma.conversaTag.findFirst).toHaveBeenCalledWith({ where: { id: 'tag-1', empresaId: 'empresa-1' } });
-    expect(prisma.conversaTag.delete).toHaveBeenCalledWith({ where: { id: 'tag-1' } });
+    expect(prisma.conversaTag.findFirst).toHaveBeenCalledWith({
+      where: { id: 'tag-1', empresaId: 'empresa-1' },
+    });
+    expect(prisma.conversaTag.delete).toHaveBeenCalledWith({
+      where: { id: 'tag-1' },
+    });
   });
 
   it('remove lança NotFoundException se a tag não for da empresa (não apaga nada)', async () => {
@@ -63,7 +78,9 @@ describe('ConversaTagService', () => {
     (prisma.conversaTag.findFirst as jest.Mock).mockResolvedValue(null);
     const service = new ConversaTagService(prisma, moduloService);
 
-    await expect(service.remove('tag-x', 'empresa-1')).rejects.toThrow(NotFoundException);
+    await expect(service.remove('tag-x', 'empresa-1')).rejects.toThrow(
+      NotFoundException,
+    );
     expect(prisma.conversaTag.delete).not.toHaveBeenCalled();
   });
 });

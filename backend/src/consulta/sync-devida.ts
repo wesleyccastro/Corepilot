@@ -5,6 +5,8 @@ export function estaDevida(
   if (!ultimaSincronizacaoEm) return true;
   if (!intervaloMinutos) return false;
 
-  const proximaExecucao = new Date(ultimaSincronizacaoEm.getTime() + intervaloMinutos * 60_000);
+  const proximaExecucao = new Date(
+    ultimaSincronizacaoEm.getTime() + intervaloMinutos * 60_000,
+  );
   return new Date() >= proximaExecucao;
 }

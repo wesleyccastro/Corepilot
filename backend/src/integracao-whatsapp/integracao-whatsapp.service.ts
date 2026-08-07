@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { criptografar, descriptografar } from '../fonte-de-dados/crypto';
@@ -18,16 +23,28 @@ export class IntegracaoWhatsAppService {
   }
 
   async salvar(empresaId: string, dto: SalvarIntegracaoWhatsAppDto) {
-    const existente = await this.prisma.integracaoWhatsApp.findUnique({ where: { empresaId } });
+    const existente = await this.prisma.integracaoWhatsApp.findUnique({
+      where: { empresaId },
+    });
     const chave = this.config.getOrThrow<string>('ERP_ENCRYPTION_KEY');
-    const apiKeyCriptografada = dto.apiKey ? criptografar(dto.apiKey, chave) : existente?.apiKeyCriptografada;
+    const apiKeyCriptografada = dto.apiKey
+      ? criptografar(dto.apiKey, chave)
+      : existente?.apiKeyCriptografada;
     if (!apiKeyCriptografada) {
-      throw new BadRequestException('apiKey é obrigatória na primeira configuração');
+      throw new BadRequestException(
+        'apiKey é obrigatória na primeira configuração',
+      );
     }
 
     return this.prisma.integracaoWhatsApp.upsert({
       where: { empresaId },
-      create: { empresaId, apiUrl: dto.apiUrl, instanceName: dto.instanceName, apiKeyCriptografada, phone: dto.phone ?? null },
+      create: {
+        empresaId,
+        apiUrl: dto.apiUrl,
+        instanceName: dto.instanceName,
+        apiKeyCriptografada,
+        phone: dto.phone ?? null,
+      },
       update: {
         apiUrl: dto.apiUrl,
         instanceName: dto.instanceName,
@@ -41,8 +58,13 @@ export class IntegracaoWhatsAppService {
   }
 
   async testar(empresaId: string) {
-    const integracao = await this.prisma.integracaoWhatsApp.findUnique({ where: { empresaId } });
-    if (!integracao) throw new NotFoundException('Integração de WhatsApp ainda não configurada');
+    const integracao = await this.prisma.integracaoWhatsApp.findUnique({
+      where: { empresaId },
+    });
+    if (!integracao)
+      throw new NotFoundException(
+        'Integração de WhatsApp ainda não configurada',
+      );
 
     const chave = this.config.getOrThrow<string>('ERP_ENCRYPTION_KEY');
     try {
@@ -56,14 +78,20 @@ export class IntegracaoWhatsAppService {
         data: {
           ultimoTesteEm: new Date(),
           ultimoTesteSucesso: resultado.conectado,
-          ultimaMensagemErro: resultado.conectado ? null : `Instância não está conectada (estado: ${resultado.estado})`,
+          ultimaMensagemErro: resultado.conectado
+            ? null
+            : `Instância não está conectada (estado: ${resultado.estado})`,
         },
       });
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : String(erro);
       await this.prisma.integracaoWhatsApp.update({
         where: { empresaId },
-        data: { ultimoTesteEm: new Date(), ultimoTesteSucesso: false, ultimaMensagemErro: mensagem },
+        data: {
+          ultimoTesteEm: new Date(),
+          ultimoTesteSucesso: false,
+          ultimaMensagemErro: mensagem,
+        },
       });
       throw new UnprocessableEntityException(mensagem);
     }

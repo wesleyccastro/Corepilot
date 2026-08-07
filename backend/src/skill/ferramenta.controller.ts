@@ -1,4 +1,11 @@
-import { BadRequestException, Controller, Delete, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Delete,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TenantGuard } from '../auth/tenant.guard';
 import { TenantContext } from '../auth/tenant-context';
@@ -19,10 +26,16 @@ export class FerramentaController {
   ) {}
 
   @Post(':consultaId')
-  async anexar(@Param('skillId') skillId: string, @Param('consultaId') consultaId: string) {
+  async anexar(
+    @Param('skillId') skillId: string,
+    @Param('consultaId') consultaId: string,
+  ) {
     const { usuarioId, empresaId } = this.tenantContext.get();
     await this.skillService.findByIdInEmpresa(skillId, empresaId);
-    const consulta = await this.consultaService.findByIdInEmpresa(consultaId, empresaId);
+    const consulta = await this.consultaService.findByIdInEmpresa(
+      consultaId,
+      empresaId,
+    );
 
     if (!consulta.testada) {
       throw new BadRequestException(
@@ -46,7 +59,10 @@ export class FerramentaController {
   }
 
   @Delete(':consultaId')
-  async remover(@Param('skillId') skillId: string, @Param('consultaId') consultaId: string) {
+  async remover(
+    @Param('skillId') skillId: string,
+    @Param('consultaId') consultaId: string,
+  ) {
     const { usuarioId, empresaId } = this.tenantContext.get();
     await this.skillService.findByIdInEmpresa(skillId, empresaId);
     await this.consultaService.findByIdInEmpresa(consultaId, empresaId);

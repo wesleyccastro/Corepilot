@@ -17,7 +17,9 @@ export function montarFerramentasDeConsultas(
   return consultas.map((consulta) => ({
     name: nomeFerramentaConsulta(consulta.id),
     description: `Consulta "${consulta.nome}" com dados sincronizados do TOTVS RM.`,
-    input_schema: construirInputSchemaFerramenta(consulta.camposFiltro as unknown as CampoSaida[]),
+    input_schema: construirInputSchemaFerramenta(
+      consulta.camposFiltro as CampoSaida[],
+    ),
   }));
 }
 
@@ -50,7 +52,9 @@ export async function buscarDadosLocaisConsulta(
   });
 
   const dados = linhas.map((linha) => linha.dados as Record<string, unknown>);
-  const chavesFiltro = Object.entries(filtro).filter(([, valor]) => valor !== undefined && valor !== '');
+  const chavesFiltro = Object.entries(filtro).filter(
+    ([, valor]) => valor !== undefined && valor !== '',
+  );
 
   // Sem filtro: devolve tudo que foi sincronizado (já limitado pelo take acima) — é o próprio
   // modelo que precisa varrer e interpretar, não um corte arbitrário do nosso lado que pode
@@ -60,6 +64,8 @@ export async function buscarDadosLocaisConsulta(
   }
 
   return dados
-    .filter((linha) => chavesFiltro.every(([chave, valor]) => valorBate(linha[chave], valor)))
+    .filter((linha) =>
+      chavesFiltro.every(([chave, valor]) => valorBate(linha[chave], valor)),
+    )
     .slice(0, MAX_LINHAS_DEVOLVIDAS_AO_MODELO);
 }

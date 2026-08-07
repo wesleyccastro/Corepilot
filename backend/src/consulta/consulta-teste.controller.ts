@@ -17,7 +17,10 @@ export class ConsultaTesteController {
   @Post()
   async testar(@Param('consultaId') consultaId: string) {
     const { empresaId } = this.tenantContext.get();
-    const consulta = await this.consultaService.findByIdInEmpresa(consultaId, empresaId);
+    const consulta = await this.consultaService.findByIdInEmpresa(
+      consultaId,
+      empresaId,
+    );
     return this.consultaSincronizacaoService.executarSincronizacao(consulta);
   }
 }

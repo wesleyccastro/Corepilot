@@ -25,7 +25,13 @@ export class MensagemService {
     tokensSaida: number,
   ) {
     return this.prisma.mensagem.create({
-      data: { conversaId, papel: 'agente', conteudo, tokensEntrada, tokensSaida },
+      data: {
+        conversaId,
+        papel: 'agente',
+        conteudo,
+        tokensEntrada,
+        tokensSaida,
+      },
     });
   }
 }

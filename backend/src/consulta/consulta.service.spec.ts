@@ -14,7 +14,9 @@ describe('ConsultaService', () => {
         update: jest.fn(),
       },
     } as unknown as PrismaService;
-    const moduloService = { findByIdInEmpresa: jest.fn() } as unknown as ModuloService;
+    const moduloService = {
+      findByIdInEmpresa: jest.fn(),
+    } as unknown as ModuloService;
     const fonteDeDadosService = {
       findByIdInEmpresa: jest.fn(),
     } as unknown as FonteDeDadosService;
@@ -26,20 +28,38 @@ describe('ConsultaService', () => {
     nome: 'Saldo de estoque',
     codSentenca: 'SALDOESTOQUEINSU',
     parametrosSincronizacao: { CODFILIAL: '001' },
-    camposFiltro: [{ nome: 'codProduto', tipo: 'string' as const, obrigatorio: true }],
+    camposFiltro: [
+      { nome: 'codProduto', tipo: 'string' as const, obrigatorio: true },
+    ],
   };
 
   it('cria uma consulta depois de validar módulo e fonte de dados na empresa', async () => {
     const { prisma, moduloService, fonteDeDadosService } = buildDeps();
-    (moduloService.findByIdInEmpresa as jest.Mock).mockResolvedValue({ id: 'modulo-1' });
-    (fonteDeDadosService.findByIdInEmpresa as jest.Mock).mockResolvedValue({ id: 'fonte-1' });
-    (prisma.consultaParametrizada.create as jest.Mock).mockResolvedValue({ id: 'consulta-1' });
-    const service = new ConsultaService(prisma, moduloService, fonteDeDadosService);
+    (moduloService.findByIdInEmpresa as jest.Mock).mockResolvedValue({
+      id: 'modulo-1',
+    });
+    (fonteDeDadosService.findByIdInEmpresa as jest.Mock).mockResolvedValue({
+      id: 'fonte-1',
+    });
+    (prisma.consultaParametrizada.create as jest.Mock).mockResolvedValue({
+      id: 'consulta-1',
+    });
+    const service = new ConsultaService(
+      prisma,
+      moduloService,
+      fonteDeDadosService,
+    );
 
     const resultado = await service.create('modulo-1', 'empresa-1', dto);
 
-    expect(moduloService.findByIdInEmpresa).toHaveBeenCalledWith('modulo-1', 'empresa-1');
-    expect(fonteDeDadosService.findByIdInEmpresa).toHaveBeenCalledWith('fonte-1', 'empresa-1');
+    expect(moduloService.findByIdInEmpresa).toHaveBeenCalledWith(
+      'modulo-1',
+      'empresa-1',
+    );
+    expect(fonteDeDadosService.findByIdInEmpresa).toHaveBeenCalledWith(
+      'fonte-1',
+      'empresa-1',
+    );
     expect(prisma.consultaParametrizada.create).toHaveBeenCalledWith({
       data: {
         moduloId: 'modulo-1',
@@ -55,28 +75,52 @@ describe('ConsultaService', () => {
 
   it('propaga NotFoundException se o módulo não for da empresa', async () => {
     const { prisma, moduloService, fonteDeDadosService } = buildDeps();
-    (moduloService.findByIdInEmpresa as jest.Mock).mockRejectedValue(new NotFoundException());
-    const service = new ConsultaService(prisma, moduloService, fonteDeDadosService);
+    (moduloService.findByIdInEmpresa as jest.Mock).mockRejectedValue(
+      new NotFoundException(),
+    );
+    const service = new ConsultaService(
+      prisma,
+      moduloService,
+      fonteDeDadosService,
+    );
 
-    await expect(service.create('modulo-x', 'empresa-1', dto)).rejects.toThrow(NotFoundException);
+    await expect(service.create('modulo-x', 'empresa-1', dto)).rejects.toThrow(
+      NotFoundException,
+    );
     expect(prisma.consultaParametrizada.create).not.toHaveBeenCalled();
   });
 
   it('propaga NotFoundException se a fonte de dados não for da empresa', async () => {
     const { prisma, moduloService, fonteDeDadosService } = buildDeps();
-    (moduloService.findByIdInEmpresa as jest.Mock).mockResolvedValue({ id: 'modulo-1' });
-    (fonteDeDadosService.findByIdInEmpresa as jest.Mock).mockRejectedValue(new NotFoundException());
-    const service = new ConsultaService(prisma, moduloService, fonteDeDadosService);
+    (moduloService.findByIdInEmpresa as jest.Mock).mockResolvedValue({
+      id: 'modulo-1',
+    });
+    (fonteDeDadosService.findByIdInEmpresa as jest.Mock).mockRejectedValue(
+      new NotFoundException(),
+    );
+    const service = new ConsultaService(
+      prisma,
+      moduloService,
+      fonteDeDadosService,
+    );
 
-    await expect(service.create('modulo-1', 'empresa-1', dto)).rejects.toThrow(NotFoundException);
+    await expect(service.create('modulo-1', 'empresa-1', dto)).rejects.toThrow(
+      NotFoundException,
+    );
     expect(prisma.consultaParametrizada.create).not.toHaveBeenCalled();
   });
 
   it('lista consultas só do módulo informado', async () => {
     const { prisma, moduloService, fonteDeDadosService } = buildDeps();
-    (moduloService.findByIdInEmpresa as jest.Mock).mockResolvedValue({ id: 'modulo-1' });
+    (moduloService.findByIdInEmpresa as jest.Mock).mockResolvedValue({
+      id: 'modulo-1',
+    });
     (prisma.consultaParametrizada.findMany as jest.Mock).mockResolvedValue([]);
-    const service = new ConsultaService(prisma, moduloService, fonteDeDadosService);
+    const service = new ConsultaService(
+      prisma,
+      moduloService,
+      fonteDeDadosService,
+    );
 
     await service.findAllByModulo('modulo-1', 'empresa-1');
 
@@ -88,12 +132,18 @@ describe('ConsultaService', () => {
 
   it('findByIdInEmpresa lança NotFoundException se não encontrar', async () => {
     const { prisma, moduloService, fonteDeDadosService } = buildDeps();
-    (prisma.consultaParametrizada.findFirst as jest.Mock).mockResolvedValue(null);
-    const service = new ConsultaService(prisma, moduloService, fonteDeDadosService);
-
-    await expect(service.findByIdInEmpresa('consulta-x', 'empresa-1')).rejects.toThrow(
-      NotFoundException,
+    (prisma.consultaParametrizada.findFirst as jest.Mock).mockResolvedValue(
+      null,
     );
+    const service = new ConsultaService(
+      prisma,
+      moduloService,
+      fonteDeDadosService,
+    );
+
+    await expect(
+      service.findByIdInEmpresa('consulta-x', 'empresa-1'),
+    ).rejects.toThrow(NotFoundException);
     expect(prisma.consultaParametrizada.findFirst).toHaveBeenCalledWith({
       where: { id: 'consulta-x', modulo: { empresaId: 'empresa-1' } },
       include: { fonteDeDados: true },
@@ -102,12 +152,18 @@ describe('ConsultaService', () => {
 
   it('atualizarSincronizacao valida posse antes de atualizar', async () => {
     const { prisma, moduloService, fonteDeDadosService } = buildDeps();
-    (prisma.consultaParametrizada.findFirst as jest.Mock).mockResolvedValue({ id: 'consulta-1' });
+    (prisma.consultaParametrizada.findFirst as jest.Mock).mockResolvedValue({
+      id: 'consulta-1',
+    });
     (prisma.consultaParametrizada.update as jest.Mock).mockResolvedValue({
       id: 'consulta-1',
       sincronizacaoAtiva: true,
     });
-    const service = new ConsultaService(prisma, moduloService, fonteDeDadosService);
+    const service = new ConsultaService(
+      prisma,
+      moduloService,
+      fonteDeDadosService,
+    );
 
     await service.atualizarSincronizacao('consulta-1', 'empresa-1', true, 60);
 

@@ -44,7 +44,11 @@ export class ConversaService {
     return conversa;
   }
 
-  async update(conversaId: string, usuarioId: string, dto: AtualizarConversaDto) {
+  async update(
+    conversaId: string,
+    usuarioId: string,
+    dto: AtualizarConversaDto,
+  ) {
     const conversa = await this.findOwned(conversaId, usuarioId);
 
     if (dto.tagId !== undefined && dto.tagId !== null) {

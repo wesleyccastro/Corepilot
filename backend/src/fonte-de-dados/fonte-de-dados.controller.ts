@@ -1,10 +1,22 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TenantGuard } from '../auth/tenant.guard';
 import { TenantContext } from '../auth/tenant-context';
 import { AuditService } from '../audit/audit.service';
-import { FonteDeDadosService, type ConfiguracaoFonteDeDados } from './fonte-de-dados.service';
+import {
+  FonteDeDadosService,
+  type ConfiguracaoFonteDeDados,
+} from './fonte-de-dados.service';
 import type { CreateFonteDeDadosDto } from './dto/create-fonte-de-dados.dto';
 import type { UpdateFonteDeDadosDto } from './dto/update-fonte-de-dados.dto';
 
@@ -59,9 +71,16 @@ export class FonteDeDadosController {
   }
 
   @Patch(':id')
-  async atualizar(@Param('id') id: string, @Body() body: UpdateFonteDeDadosDto) {
+  async atualizar(
+    @Param('id') id: string,
+    @Body() body: UpdateFonteDeDadosDto,
+  ) {
     const { usuarioId, empresaId } = this.tenantContext.get();
-    const resultado = await this.fonteDeDadosService.update(id, empresaId, body);
+    const resultado = await this.fonteDeDadosService.update(
+      id,
+      empresaId,
+      body,
+    );
 
     await this.audit.record({
       empresaId,
@@ -74,7 +93,7 @@ export class FonteDeDadosController {
         codSistema: body.codSistema,
         codColigada: body.codColigada,
         senhaAlterada: !!body.senha,
-      } as unknown as Prisma.InputJsonValue,
+      },
     });
 
     return sanitizar(resultado);

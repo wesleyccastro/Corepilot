@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Logger, Param, Post, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Logger,
+  Param,
+  Post,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TenantGuard } from '../auth/tenant.guard';
@@ -19,7 +28,11 @@ interface EnviarMensagemBody {
   conteudo: string;
 }
 
-function montarSystemPrompt(modulo: { nome: string; objetivo: string; instrucoes: string | null }): string {
+function montarSystemPrompt(modulo: {
+  nome: string;
+  objetivo: string;
+  instrucoes: string | null;
+}): string {
   const partes = [
     `Você é o assistente de IA do módulo "${modulo.nome}" desta empresa.`,
     `Objetivo do módulo: ${modulo.objetivo}`,
@@ -43,7 +56,8 @@ interface RespostaComUso {
 
 const MENSAGEM_RESPOSTA_TRUNCADA =
   'A resposta ficou grande demais e foi cortada antes de terminar. Pode tentar de novo pedindo algo mais específico (ex.: um talhão ou período menor)?';
-const MENSAGEM_RESPOSTA_VAZIA = 'Não consegui gerar uma resposta para essa pergunta. Pode tentar reformular?';
+const MENSAGEM_RESPOSTA_VAZIA =
+  'Não consegui gerar uma resposta para essa pergunta. Pode tentar reformular?';
 
 function extrairTexto(content: Array<Record<string, unknown>>): string {
   return content
@@ -81,7 +95,10 @@ export class MensagemController {
     @Res() res: Response,
   ) {
     const { usuarioId, empresaId } = this.tenantContext.get();
-    const conversa = await this.conversaService.findOwned(conversaId, usuarioId);
+    const conversa = await this.conversaService.findOwned(
+      conversaId,
+      usuarioId,
+    );
 
     await this.mensagemService.appendUserMessage(conversaId, body.conteudo);
     const historico = await this.mensagemService.listByConversa(conversaId);
@@ -92,21 +109,35 @@ export class MensagemController {
 
     const system = montarSystemPrompt(conversa.modulo);
     let mensagens: MensagemConversa[] = historico.map((mensagem) => ({
-      role: mensagem.papel === 'usuario' ? ('user' as const) : ('assistant' as const),
+      role:
+        mensagem.papel === 'usuario'
+          ? ('user' as const)
+          : ('assistant' as const),
       content: mensagem.conteudo,
     }));
 
     let ferramentasUsadas = false;
 
     try {
-      const consultas = await this.consultaService.findAllByModulo(conversa.moduloId, empresaId);
-      const consultasTestadas = consultas.filter((consulta) => consulta.testada);
+      const consultas = await this.consultaService.findAllByModulo(
+        conversa.moduloId,
+        empresaId,
+      );
+      const consultasTestadas = consultas.filter(
+        (consulta) => consulta.testada,
+      );
 
       let respostaJaFinalizada: RespostaComUso | null = null;
 
       if (consultasTestadas.length > 0) {
         ferramentasUsadas = true;
-        const resultado = await this.resolverFerramentas(res, mensagens, system, conversa.modulo.modeloIA, consultasTestadas);
+        const resultado = await this.resolverFerramentas(
+          res,
+          mensagens,
+          system,
+          conversa.modulo.modeloIA,
+          consultasTestadas,
+        );
         mensagens = resultado.mensagens;
         respostaJaFinalizada = resultado.respostaFinal;
       }
@@ -124,7 +155,12 @@ export class MensagemController {
         stopReason = respostaJaFinalizada.stop_reason;
       } else {
         if (ferramentasUsadas) {
-          res.write(JSON.stringify({ type: 'status', mensagem: 'Redigindo a resposta…' }) + '\n');
+          res.write(
+            JSON.stringify({
+              type: 'status',
+              mensagem: 'Redigindo a resposta…',
+            }) + '\n',
+          );
         }
         const stream = this.anthropicService.streamReplyFromHistory({
           system,
@@ -134,20 +170,32 @@ export class MensagemController {
         });
 
         for await (const event of stream) {
-          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-            res.write(JSON.stringify({ type: 'delta', text: event.delta.text }) + '\n');
+          if (
+            event.type === 'content_block_delta' &&
+            event.delta.type === 'text_delta'
+          ) {
+            res.write(
+              JSON.stringify({ type: 'delta', text: event.delta.text }) + '\n',
+            );
           }
         }
 
         const final = await stream.finalMessage();
-        textoCompleto = extrairTexto(final.content as unknown as Array<Record<string, unknown>>);
+        textoCompleto = extrairTexto(
+          final.content as unknown as Array<Record<string, unknown>>,
+        );
         usage = final.usage;
         stopReason = final.stop_reason ?? 'desconhecido';
       }
 
       if (!textoCompleto.trim()) {
-        this.logger.warn(`Resposta do chat veio vazia (stop_reason=${stopReason}) na conversa ${conversaId}`);
-        textoCompleto = stopReason === 'max_tokens' ? MENSAGEM_RESPOSTA_TRUNCADA : MENSAGEM_RESPOSTA_VAZIA;
+        this.logger.warn(
+          `Resposta do chat veio vazia (stop_reason=${stopReason}) na conversa ${conversaId}`,
+        );
+        textoCompleto =
+          stopReason === 'max_tokens'
+            ? MENSAGEM_RESPOSTA_TRUNCADA
+            : MENSAGEM_RESPOSTA_VAZIA;
       }
       res.write(JSON.stringify({ type: 'delta', text: textoCompleto }) + '\n');
 
@@ -180,8 +228,14 @@ export class MensagemController {
         }) + '\n',
       );
     } catch (err) {
-      this.logger.error('Falha ao gerar resposta do chat', err instanceof Error ? err.stack : err);
-      res.write(JSON.stringify({ type: 'erro', mensagem: 'Falha ao gerar resposta' }) + '\n');
+      this.logger.error(
+        'Falha ao gerar resposta do chat',
+        err instanceof Error ? err.stack : err,
+      );
+      res.write(
+        JSON.stringify({ type: 'erro', mensagem: 'Falha ao gerar resposta' }) +
+          '\n',
+      );
     } finally {
       res.end();
     }
@@ -193,15 +247,25 @@ export class MensagemController {
     system: string,
     model: string,
     consultas: { id: string; nome: string; camposFiltro: unknown }[],
-  ): Promise<{ mensagens: MensagemConversa[]; respostaFinal: RespostaComUso | null }> {
+  ): Promise<{
+    mensagens: MensagemConversa[];
+    respostaFinal: RespostaComUso | null;
+  }> {
     const tools = montarFerramentasDeConsultas(consultas);
-    const nomesPorConsultaId = new Map(consultas.map((consulta) => [consulta.id, consulta.nome]));
+    const nomesPorConsultaId = new Map(
+      consultas.map((consulta) => [consulta.id, consulta.nome]),
+    );
     let mensagens = mensagensIniciais;
 
-    const emitirStatus = (mensagem: string) => res.write(JSON.stringify({ type: 'status', mensagem }) + '\n');
+    const emitirStatus = (mensagem: string) =>
+      res.write(JSON.stringify({ type: 'status', mensagem }) + '\n');
 
     for (let iteracao = 0; iteracao < MAX_ITERACOES_TOOL_USE; iteracao++) {
-      emitirStatus(iteracao === 0 ? 'Verificando quais dados essa pergunta precisa…' : 'Analisando os dados retornados…');
+      emitirStatus(
+        iteracao === 0
+          ? 'Verificando quais dados essa pergunta precisa…'
+          : 'Analisando os dados retornados…',
+      );
 
       const resposta = (await this.anthropicService.createWithTools({
         system,
@@ -215,11 +279,18 @@ export class MensagemController {
         return { mensagens, respostaFinal: resposta };
       }
 
-      mensagens = [...mensagens, { role: 'assistant', content: resposta.content }];
+      mensagens = [
+        ...mensagens,
+        { role: 'assistant', content: resposta.content },
+      ];
 
-      const blocosDeTool = resposta.content.filter((bloco) => bloco.type === 'tool_use');
+      const blocosDeTool = resposta.content.filter(
+        (bloco) => bloco.type === 'tool_use',
+      );
       const nomesConsultadosNesteTurno = blocosDeTool
-        .map((bloco) => nomesPorConsultaId.get(consultaIdDaFerramenta(bloco.name as string)))
+        .map((bloco) =>
+          nomesPorConsultaId.get(consultaIdDaFerramenta(bloco.name as string)),
+        )
         .filter((nome): nome is string => !!nome);
       if (nomesConsultadosNesteTurno.length > 0) {
         emitirStatus(`Consultando ${nomesConsultadosNesteTurno.join(', ')}…`);
@@ -228,8 +299,16 @@ export class MensagemController {
       const resultadosDeTool = await Promise.all(
         blocosDeTool.map(async (bloco) => {
           const consultaId = consultaIdDaFerramenta(bloco.name as string);
-          const linhas = await buscarDadosLocaisConsulta(this.prisma, consultaId, bloco.input as Record<string, unknown>);
-          return { type: 'tool_result', tool_use_id: bloco.id as string, content: JSON.stringify(linhas) };
+          const linhas = await buscarDadosLocaisConsulta(
+            this.prisma,
+            consultaId,
+            bloco.input as Record<string, unknown>,
+          );
+          return {
+            type: 'tool_result',
+            tool_use_id: bloco.id as string,
+            content: JSON.stringify(linhas),
+          };
         }),
       );
 

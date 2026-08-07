@@ -64,7 +64,10 @@ export class ModuloController {
   }
 
   @Post(':id/rascunho-instrucoes')
-  async rascunharInstrucoes(@Param('id') id: string, @Body() body: RascunharInstrucoesDto) {
+  async rascunharInstrucoes(
+    @Param('id') id: string,
+    @Body() body: RascunharInstrucoesDto,
+  ) {
     const { usuarioId, empresaId } = this.tenantContext.get();
     const modulo = await this.moduloService.findByIdInEmpresa(id, empresaId);
 
@@ -89,7 +92,9 @@ export class ModuloController {
     });
 
     if (!response.parsed_output) {
-      throw new UnprocessableEntityException('A resposta da IA não pôde ser validada');
+      throw new UnprocessableEntityException(
+        'A resposta da IA não pôde ser validada',
+      );
     }
 
     await this.audit.record({
