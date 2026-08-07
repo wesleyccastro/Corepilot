@@ -300,7 +300,7 @@ export function createInitialState(): CorePilotState {
       objective: 'Unificar dados de safra, fazendas e talhões para decisões mais rápidas e confiáveis.',
       owner: 'Marcos Silva',
       areas: 'Todas as fazendas · LFG Agro',
-      icon: 'leaf',
+      icon: 'Leaf',
       color: '#0EA5A0',
     },
     agentForm: {

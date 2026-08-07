@@ -1,15 +1,9 @@
 import type { CorePilotState } from '../../initialState';
 import type { CorePilotActions } from '../../useCorePilotState';
-import { CheckIcon, LayersIcon } from '../../icons';
+import { CheckIcon } from '../../icons';
+import { IconPicker } from '../../components/IconPicker';
 import { card, colors, input, label } from '../../styles';
 
-const iconChoices = [
-  { key: 'leaf', label: 'Agro' },
-  { key: 'cart', label: 'Compras' },
-  { key: 'wallet', label: 'Financeiro' },
-  { key: 'wrench', label: 'Manutenção' },
-  { key: 'users', label: 'Pessoas' },
-];
 const colorHexes = ['#0EA5A0', '#07364A', '#E8604C', '#D97706', '#1E9E6B'];
 
 export function Step1Identity({ state, actions }: { state: CorePilotState; actions: CorePilotActions }) {
@@ -48,16 +42,7 @@ export function Step1Identity({ state, actions }: { state: CorePilotState; actio
         </div>
         <div>
           <label style={{ ...label, marginBottom: 8 }}>Ícone</label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {iconChoices.map((ic) => {
-              const active = f.icon === ic.key;
-              return (
-                <div key={ic.key} onClick={() => actions.selectIcon(ic.key)} title={ic.label} style={{ width: 44, height: 44, borderRadius: 10, border: `1.5px solid ${active ? colors.teal : colors.border}`, background: active ? colors.successBg : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' }}>
-                  <LayersIcon size={18} color={active ? colors.teal : colors.textMuted} />
-                </div>
-              );
-            })}
-          </div>
+          <IconPicker value={f.icon} onChange={actions.selectIcon} />
         </div>
         <div>
           <label style={{ ...label, marginBottom: 8 }}>Cor de identificação</label>
