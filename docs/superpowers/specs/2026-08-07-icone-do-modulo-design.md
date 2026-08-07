@@ -76,12 +76,20 @@ Novo `frontend/src/corepilot/components/IconPicker.tsx`, reutilizável:
   dentro do formulário do Wizard.
 - Botão 44×44 (mesmo tamanho dos quadrados atuais) mostrando
   `resolveModuleIcon(value)`.
-- Ao clicar, abre popover ancorado no botão: overlay de clique-fora (mesmo
-  padrão de `overlayFixed` já usado no menu do usuário em `Header.tsx`), campo
-  de busca com autofoco no topo, grade de botões de ícone abaixo.
+- Ao clicar, abre um **modal centralizado** (mesmo padrão visual do
+  `ConfirmDialog.tsx` já usado no app: overlay `rgba(7,54,74,.32)`, card branco
+  `borderRadius: 14`, `boxShadow: '0 20px 48px rgba(7,54,74,.28)'`) — não um
+  popover ancorado (revisado durante a checagem visual manual: ícones maiores
+  pedem mais espaço do que um popover estreito comporta). Dentro: preview do
+  ícone selecionado + nome, campo de busca com autofoco, grade de ícones
+  44×44 (maiores que a v1: 22px em vez de 16px), e rodapé com "Cancelar"/
+  "Aplicar".
+- Seleção em duas etapas: clicar num ícone da grade só destaca/staging
+  (`selecionado` no estado local do componente, inicializado com `value` toda
+  vez que o modal abre); só o clique em "Aplicar" chama `onChange(selecionado)`
+  e fecha. "Cancelar" ou clique no overlay fecha sem aplicar.
 - Filtro: substring case-insensitive sobre `nome` (de `allLucideIcons`); busca
   vazia mostra o catálogo completo sem paginação.
-- Clique num ícone da grade chama `onChange(nome)` e fecha o popover.
 
 `Step1Identity.tsx` troca a linha de 5 quadrados por
 `<IconPicker value={f.icon} onChange={actions.selectIcon} />` — `selectIcon`

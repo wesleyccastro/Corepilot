@@ -181,10 +181,16 @@ export function resolveModuleIcon(nome: string | null | undefined): LucideIcon {
 
 - [ ] **Step 1: Criar o componente**
 
+**Revisado durante a checagem visual manual (Task 7):** a versão original abaixo era um popover
+estreito (300px) ancorado no botão. Depois de ver rodando, decisão foi trocar por um modal
+centralizado (mesmo padrão do `ConfirmDialog.tsx`), com ícones maiores (44×44/22px em vez de
+30×30/16px) e fluxo de seleção em duas etapas (clicar na grade só destaca; só "Aplicar" chama
+`onChange`). Código final:
+
 ```tsx
 import { useState } from 'react';
 import { allLucideIcons, resolveModuleIcon } from '../lucideIcons';
-import { colors, overlayFixed, inputSm } from '../styles';
+import { colors, inputSm } from '../styles';
 
 interface IconPickerProps {
   value: string;
@@ -194,11 +200,19 @@ interface IconPickerProps {
 export function IconPicker({ value, onChange }: IconPickerProps) {
   const [aberto, setAberto] = useState(false);
   const [busca, setBusca] = useState('');
+  const [selecionado, setSelecionado] = useState(value);
   const IconeAtual = resolveModuleIcon(value);
+  const IconeSelecionado = resolveModuleIcon(selecionado);
 
-  const fechar = () => {
-    setAberto(false);
+  const abrir = () => {
+    setSelecionado(value);
     setBusca('');
+    setAberto(true);
+  };
+  const fechar = () => setAberto(false);
+  const aplicar = () => {
+    onChange(selecionado);
+    fechar();
   };
 
   const resultados = busca.trim()
@@ -206,47 +220,70 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
     : allLucideIcons;
 
   return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
+    <>
       <div
-        onClick={() => setAberto((a) => !a)}
+        onClick={abrir}
         title={value}
-        style={{ width: 44, height: 44, borderRadius: 10, border: `1.5px solid ${aberto ? colors.teal : colors.border}`, background: aberto ? colors.successBg : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+        style={{ width: 44, height: 44, borderRadius: 10, border: `1.5px solid ${colors.border}`, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
       >
-        <IconeAtual size={18} color={aberto ? colors.teal : colors.textMuted} />
+        <IconeAtual size={18} color={colors.textMuted} />
       </div>
       {aberto && (
-        <>
-          <div style={overlayFixed} onClick={fechar} />
-          <div style={{ position: 'absolute', top: 52, left: 0, background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 10, boxShadow: '0 12px 28px rgba(7,54,74,.18)', width: 300, zIndex: 50, padding: 10 }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(7,54,74,.32)' }} onClick={fechar} />
+          <div style={{ position: 'relative', background: '#fff', borderRadius: 14, padding: 24, width: 520, maxWidth: '90vw', boxShadow: '0 20px 48px rgba(7,54,74,.28)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 10, border: `1.5px solid ${colors.teal}`, background: colors.successBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <IconeSelecionado size={22} color={colors.teal} />
+              </div>
+              <div>
+                <h2 style={{ fontSize: 16, fontWeight: 800, color: colors.navy, margin: 0 }}>Escolher ícone</h2>
+                <p style={{ fontSize: 12, color: colors.textFaint, margin: 0 }}>{selecionado}</p>
+              </div>
+            </div>
             <input
               type="text"
               autoFocus
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               placeholder="Buscar ícone…"
-              style={{ ...inputSm, width: '100%', marginBottom: 8, boxSizing: 'border-box' }}
+              style={{ ...inputSm, width: '100%', boxSizing: 'border-box' }}
             />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 4, maxHeight: 260, overflowY: 'auto' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxHeight: 360, overflowY: 'auto', padding: 2 }}>
               {resultados.map(({ nome, Icone }) => (
                 <div
                   key={nome}
-                  onClick={() => { onChange(nome); fechar(); }}
+                  onClick={() => setSelecionado(nome)}
                   title={nome}
-                  style={{ width: 30, height: 30, borderRadius: 6, border: `1px solid ${value === nome ? colors.teal : 'transparent'}`, background: value === nome ? colors.successBg : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 8, border: `1.5px solid ${selecionado === nome ? colors.teal : colors.border}`, background: selecionado === nome ? colors.successBg : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                 >
-                  <Icone size={16} color={colors.textMuted} />
+                  <Icone size={22} color={selecionado === nome ? colors.teal : colors.textMuted} />
                 </div>
               ))}
               {resultados.length === 0 && (
-                <div style={{ gridColumn: '1 / -1', fontSize: 12, color: colors.textFaint, textAlign: 'center', padding: '12px 0' }}>
+                <div style={{ width: '100%', fontSize: 12, color: colors.textFaint, textAlign: 'center', padding: '20px 0' }}>
                   Nenhum ícone encontrado.
                 </div>
               )}
             </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button
+                onClick={fechar}
+                style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, color: colors.navy, cursor: 'pointer' }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={aplicar}
+                style={{ background: colors.teal, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+              >
+                Aplicar
+              </button>
+            </div>
           </div>
-        </>
+        </div>
       )}
-    </div>
+    </>
   );
 }
 ```
