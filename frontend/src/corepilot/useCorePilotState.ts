@@ -533,6 +533,7 @@ export function useCorePilotState(accessToken: string) {
   const goAdminSettings = () => update((s) => ({ view: 'admin-settings', previousView: s.view, userMenuOpen: false }));
   const openGeneralSettings = () => goAdminSettings();
   const openCompanySettings = () => update((s) => ({ view: 'admin-company', previousView: s.view, userMenuOpen: false }));
+  const openConectores = () => update((s) => ({ view: 'conectores', previousView: s.view, userMenuOpen: false }));
   const backFromAdmin = () => update((s) => ({ view: s.previousView || 'overview' }));
   const setAdminTab = (tab: 'profiles' | 'users') => update({ adminTab: tab });
   const toggleUserMenu = () => update((s) => ({ userMenuOpen: !s.userMenuOpen }));
@@ -1613,7 +1614,7 @@ export function useCorePilotState(accessToken: string) {
     openComprasArchive, closeComprasArchive, openFinanceiroArchive, closeFinanceiroArchive, autoGrowInput,
     onAttachFiles, removeAttachment, updateDraft, selectComprasChat, selectFinanceiroChat,
     sendComprasMessage, sendFinanceiroMessage, sendOverviewMessage, handleEnterSend, makeQuickAction,
-    goAdminUsers, goAdminSettings, openGeneralSettings, openCompanySettings, backFromAdmin, setAdminTab,
+    goAdminUsers, goAdminSettings, openGeneralSettings, openCompanySettings, openConectores, backFromAdmin, setAdminTab,
     toggleUserMenu, closeUserMenu, openUsersFromMenu,
     abrirConfirmacao, fecharConfirmacao, confirmarAcaoPendente, goAdminModulos, alternarStatusModulo,
     abrirExclusaoModulo, fecharExclusaoModulo, updateExcluirModuloTexto, confirmarExclusaoModulo,

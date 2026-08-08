@@ -13,6 +13,7 @@ import { AdminUsers } from './views/admin/AdminUsers';
 import { AdminSettings } from './views/admin/AdminSettings';
 import { AdminCompany } from './views/admin/AdminCompany';
 import { AdminModulos } from './views/admin/AdminModulos';
+import { Conectores } from './views/Conectores';
 
 interface CorePilotAppProps {
   accessToken: string;
@@ -26,6 +27,10 @@ export function CorePilotApp({ accessToken, abrirWizardAoEntrar }: CorePilotAppP
 
   useEffect(() => {
     if (abrirWizardAoEntrar) actions.viewWizardNew();
+    if (window.location.search.includes('conectores=')) {
+      actions.setView('conectores');
+      window.history.replaceState(null, '', window.location.pathname);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -42,6 +47,7 @@ export function CorePilotApp({ accessToken, abrirWizardAoEntrar }: CorePilotAppP
         {state.view === 'admin-settings' && <AdminSettings state={state} actions={actions} />}
         {state.view === 'admin-company' && <AdminCompany state={state} actions={actions} accessToken={accessToken} me={me} onEmpresaUpdated={refetchMe} />}
         {state.view === 'admin-modulos' && <AdminModulos state={state} actions={actions} me={me} />}
+        {state.view === 'conectores' && <Conectores state={state} actions={actions} accessToken={accessToken} />}
         {activeModule && <CustomModuleView module={activeModule} state={state} actions={actions} />}
       </div>
 

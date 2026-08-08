@@ -7,6 +7,7 @@ export type ViewId =
   | 'admin-settings'
   | 'admin-company'
   | 'admin-modulos'
+  | 'conectores'
   | `module:${string}`;
 
 export interface ConfirmDialogState {
