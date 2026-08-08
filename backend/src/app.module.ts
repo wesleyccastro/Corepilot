@@ -19,6 +19,7 @@ import { FerramentaModule } from './skill/ferramenta.module';
 import { OrquestradorModule } from './orquestrador/orquestrador.module';
 import { IntegracaoWhatsAppModule } from './integracao-whatsapp/integracao-whatsapp.module';
 import { CadastroEmpresaModule } from './cadastro-empresa/cadastro-empresa.module';
+import { ConectorModule } from './conector/conector.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { CadastroEmpresaModule } from './cadastro-empresa/cadastro-empresa.modul
     OrquestradorModule,
     IntegracaoWhatsAppModule,
     CadastroEmpresaModule,
+    ConectorModule,
   ],
   controllers: [AppController],
   providers: [AppService],
