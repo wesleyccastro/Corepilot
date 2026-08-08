@@ -29,6 +29,7 @@ model Empresa {
   conversaTags         ConversaTag[]
   integracaoWhatsapp   IntegracaoWhatsApp?
   instanciasDeProcesso InstanciaDeProcesso[]
+  conectores           ConectorConexao[]
 }
 
 model Usuario {
@@ -43,6 +44,7 @@ model Usuario {
   conversas        Conversa[]
   skillExecucoes   SkillExecucao[]
   execucoesDeEtapa ExecucaoDeEtapa[]
+  conectores       ConectorConexao[]
 }
 
 enum Perfil {
@@ -235,6 +237,27 @@ model ConsultaResultado {
   sincronizadoEm          DateTime @default(now())
 
   consulta ConsultaParametrizada @relation(fields: [consultaParametrizadaId], references: [id], onDelete: Cascade)
+}
+
+model ConectorConexao {
+  id                        String    @id @default(uuid())
+  usuarioId                 String
+  empresaId                 String
+  provider                  String
+  contaExterna              String?
+  accessTokenCriptografado  String
+  refreshTokenCriptografado String?
+  expiraEm                  DateTime?
+  escopos                   String[]
+  ultimoTesteEm             DateTime?
+  ultimoTesteSucesso        Boolean?
+  criadoEm                  DateTime  @default(now())
+  atualizadoEm              DateTime  @updatedAt
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+  empresa Empresa @relation(fields: [empresaId], references: [id])
+
+  @@unique([usuarioId, empresaId, provider])
 }
 
 model Fluxo {
