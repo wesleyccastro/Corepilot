@@ -69,6 +69,19 @@ export class GoogleConectorProvider implements ConectorProvider {
     };
   }
 
+  async revogarToken(token: string): Promise<void> {
+    const resposta = await fetch('https://oauth2.googleapis.com/revoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ token }),
+    });
+    if (!resposta.ok) {
+      throw new Error(
+        `Google rejeitou a revogação do token (status ${resposta.status}): ${await resposta.text()}`,
+      );
+    }
+  }
+
   private async chamarEndpointDeToken(
     parametros: Record<string, string>,
   ): Promise<RespostaTokenGoogle> {

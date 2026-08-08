@@ -2,6 +2,7 @@ import {
   Controller,
   Delete,
   Get,
+  Logger,
   Param,
   Query,
   Res,
@@ -17,6 +18,8 @@ import { ConectorService } from './conector.service';
 
 @Controller('conectores')
 export class ConectorController {
+  private readonly logger = new Logger(ConectorController.name);
+
   constructor(
     private readonly conectorService: ConectorService,
     private readonly audit: AuditService,
@@ -63,7 +66,10 @@ export class ConectorController {
         dadosDepois: { provider },
       });
       res.redirect(`${frontendOrigin}/?conectores=sucesso`);
-    } catch {
+    } catch (erro) {
+      this.logger.warn(
+        `Callback do provider "${provider}" falhou: ${erro instanceof Error ? erro.message : String(erro)}`,
+      );
       res.redirect(`${frontendOrigin}/?conectores=erro`);
     }
   }

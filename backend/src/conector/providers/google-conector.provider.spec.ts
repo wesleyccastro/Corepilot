@@ -132,4 +132,43 @@ describe('GoogleConectorProvider', () => {
       'Google rejeitou a renovação do token',
     );
   });
+
+  it('revogarToken chama o endpoint de revogação do Google com o token informado', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(''),
+    } as Response);
+    const provider = new GoogleConectorProvider(buildConfig());
+
+    await provider.revogarToken('token-a-revogar');
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://oauth2.googleapis.com/revoke',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      }),
+    );
+    const chamadas = (global.fetch as jest.Mock).mock.calls as [
+      string,
+      { body: URLSearchParams },
+    ][];
+    const [, opcoes] = chamadas[0];
+    expect(opcoes.body.toString()).toBe(
+      new URLSearchParams({ token: 'token-a-revogar' }).toString(),
+    );
+  });
+
+  it('revogarToken lança erro descritivo quando o Google rejeita a revogação', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: () => Promise.resolve('invalid_token'),
+    } as Response);
+    const provider = new GoogleConectorProvider(buildConfig());
+
+    await expect(provider.revogarToken('token-invalido')).rejects.toThrow(
+      'Google rejeitou a revogação do token',
+    );
+  });
 });

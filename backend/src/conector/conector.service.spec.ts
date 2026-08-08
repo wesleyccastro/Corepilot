@@ -1,7 +1,7 @@
 import { UnauthorizedException, NotFoundException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { ConectorService } from './conector.service';
-import { descriptografar } from '../fonte-de-dados/crypto';
+import { criptografar, descriptografar } from '../fonte-de-dados/crypto';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { GoogleConectorProvider } from './providers/google-conector.provider';
 
@@ -14,6 +14,7 @@ describe('ConectorService', () => {
       conectorConexao: {
         upsert: jest.fn(),
         findMany: jest.fn(),
+        findUnique: jest.fn(),
         deleteMany: jest.fn(),
       },
     } as unknown as PrismaService;
@@ -29,6 +30,7 @@ describe('ConectorService', () => {
       ),
       trocarCodigoPorToken: jest.fn(),
       renovarToken: jest.fn(),
+      revogarToken: jest.fn(),
     } as unknown as GoogleConectorProvider;
     return { prisma, config, googleProvider };
   }
@@ -152,6 +154,26 @@ describe('ConectorService', () => {
         .calls[0][0] as { update: Record<string, unknown> };
       expect(chamada.update.refreshTokenCriptografado).toBeUndefined();
     });
+
+    it('rejeita a reutilização do mesmo state (replay)', async () => {
+      const { prisma, config, googleProvider } = buildDeps();
+      (googleProvider.trocarCodigoPorToken as jest.Mock).mockResolvedValue({
+        accessToken: 'access-123',
+        refreshToken: 'refresh-123',
+        expiraEm: new Date('2026-01-01T00:00:00Z'),
+        escopos: ['drive.readonly'],
+        contaExterna: 'fulano@gmail.com',
+      });
+      const service = new ConectorService(prisma, config, googleProvider);
+      const url = service.iniciar('google', 'usuario-1', 'empresa-1');
+      const state = extrairStateDaUrl(url);
+
+      await service.processarCallback('google', 'codigo', state);
+
+      await expect(
+        service.processarCallback('google', 'codigo', state),
+      ).rejects.toThrow(UnauthorizedException);
+    });
   });
 
   describe('listar', () => {
@@ -190,10 +212,98 @@ describe('ConectorService', () => {
   describe('desconectar', () => {
     it('apaga a conexão escopada por usuário, empresa e provider', async () => {
       const { prisma, config, googleProvider } = buildDeps();
+      (prisma.conectorConexao.findUnique as jest.Mock).mockResolvedValue(null);
       const service = new ConectorService(prisma, config, googleProvider);
 
       await service.desconectar('google', 'usuario-1', 'empresa-1');
 
+      expect(prisma.conectorConexao.deleteMany).toHaveBeenCalledWith({
+        where: {
+          usuarioId: 'usuario-1',
+          empresaId: 'empresa-1',
+          provider: 'google',
+        },
+      });
+    });
+
+    it('revoga o refresh token (descriptografado) no provider quando a conexão tem um', async () => {
+      const { prisma, config, googleProvider } = buildDeps();
+      (prisma.conectorConexao.findUnique as jest.Mock).mockResolvedValue({
+        id: 'conexao-1',
+        usuarioId: 'usuario-1',
+        empresaId: 'empresa-1',
+        provider: 'google',
+        accessTokenCriptografado: criptografar('access-123', CHAVE_CRIPTO),
+        refreshTokenCriptografado: criptografar('refresh-123', CHAVE_CRIPTO),
+      });
+      const service = new ConectorService(prisma, config, googleProvider);
+
+      await service.desconectar('google', 'usuario-1', 'empresa-1');
+
+      expect(googleProvider.revogarToken).toHaveBeenCalledWith('refresh-123');
+      expect(prisma.conectorConexao.deleteMany).toHaveBeenCalledWith({
+        where: {
+          usuarioId: 'usuario-1',
+          empresaId: 'empresa-1',
+          provider: 'google',
+        },
+      });
+    });
+
+    it('revoga o access token (descriptografado) quando não há refresh token', async () => {
+      const { prisma, config, googleProvider } = buildDeps();
+      (prisma.conectorConexao.findUnique as jest.Mock).mockResolvedValue({
+        id: 'conexao-1',
+        usuarioId: 'usuario-1',
+        empresaId: 'empresa-1',
+        provider: 'google',
+        accessTokenCriptografado: criptografar('access-123', CHAVE_CRIPTO),
+        refreshTokenCriptografado: null,
+      });
+      const service = new ConectorService(prisma, config, googleProvider);
+
+      await service.desconectar('google', 'usuario-1', 'empresa-1');
+
+      expect(googleProvider.revogarToken).toHaveBeenCalledWith('access-123');
+      expect(prisma.conectorConexao.deleteMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('ainda apaga a conexão local mesmo quando a revogação no provider falha (best-effort)', async () => {
+      const { prisma, config, googleProvider } = buildDeps();
+      (prisma.conectorConexao.findUnique as jest.Mock).mockResolvedValue({
+        id: 'conexao-1',
+        usuarioId: 'usuario-1',
+        empresaId: 'empresa-1',
+        provider: 'google',
+        accessTokenCriptografado: criptografar('access-123', CHAVE_CRIPTO),
+        refreshTokenCriptografado: criptografar('refresh-123', CHAVE_CRIPTO),
+      });
+      (googleProvider.revogarToken as jest.Mock).mockRejectedValue(
+        new Error('Google indisponível'),
+      );
+      const service = new ConectorService(prisma, config, googleProvider);
+
+      await expect(
+        service.desconectar('google', 'usuario-1', 'empresa-1'),
+      ).resolves.not.toThrow();
+
+      expect(prisma.conectorConexao.deleteMany).toHaveBeenCalledWith({
+        where: {
+          usuarioId: 'usuario-1',
+          empresaId: 'empresa-1',
+          provider: 'google',
+        },
+      });
+    });
+
+    it('não tenta revogar quando não existe conexão, mas ainda assim apaga', async () => {
+      const { prisma, config, googleProvider } = buildDeps();
+      (prisma.conectorConexao.findUnique as jest.Mock).mockResolvedValue(null);
+      const service = new ConectorService(prisma, config, googleProvider);
+
+      await service.desconectar('google', 'usuario-1', 'empresa-1');
+
+      expect(googleProvider.revogarToken).not.toHaveBeenCalled();
       expect(prisma.conectorConexao.deleteMany).toHaveBeenCalledWith({
         where: {
           usuarioId: 'usuario-1',

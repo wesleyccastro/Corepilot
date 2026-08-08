@@ -12,4 +12,5 @@ export interface ConectorProvider {
   renovarToken(
     refreshToken: string,
   ): Promise<Pick<DadosToken, 'accessToken' | 'expiraEm'>>;
+  revogarToken(token: string): Promise<void>;
 }

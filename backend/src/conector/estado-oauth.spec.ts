@@ -8,6 +8,7 @@ describe('estado-oauth (assinatura HMAC do state do OAuth2)', () => {
       usuarioId: 'usuario-1',
       empresaId: 'empresa-1',
       provider: 'google',
+      jti: 'nonce-de-teste',
       exp: Date.now() + 60_000,
     };
 
@@ -17,12 +18,30 @@ describe('estado-oauth (assinatura HMAC do state do OAuth2)', () => {
     expect(verificado).toEqual(payload);
   });
 
+  it('preserva o jti (nonce de uso único) através do ciclo assinar/verificar', () => {
+    const estado = assinarEstado(
+      {
+        usuarioId: 'u1',
+        empresaId: 'e1',
+        provider: 'google',
+        jti: 'nonce-unico-123',
+        exp: Date.now() + 60_000,
+      },
+      segredo,
+    );
+
+    const verificado = verificarEstado(estado, segredo);
+
+    expect(verificado.jti).toBe('nonce-unico-123');
+  });
+
   it('rejeita um state com assinatura adulterada', () => {
     const estado = assinarEstado(
       {
         usuarioId: 'u1',
         empresaId: 'e1',
         provider: 'google',
+        jti: 'nonce-de-teste',
         exp: Date.now() + 60_000,
       },
       segredo,
@@ -39,6 +58,7 @@ describe('estado-oauth (assinatura HMAC do state do OAuth2)', () => {
         usuarioId: 'u1',
         empresaId: 'e1',
         provider: 'google',
+        jti: 'nonce-de-teste',
         exp: Date.now() + 60_000,
       },
       segredo,
@@ -57,6 +77,7 @@ describe('estado-oauth (assinatura HMAC do state do OAuth2)', () => {
         usuarioId: 'u1',
         empresaId: 'e1',
         provider: 'google',
+        jti: 'nonce-de-teste',
         exp: Date.now() - 1000,
       },
       segredo,

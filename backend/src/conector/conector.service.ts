@@ -1,11 +1,13 @@
+import { randomBytes } from 'crypto';
 import {
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
-import { criptografar } from '../fonte-de-dados/crypto';
+import { criptografar, descriptografar } from '../fonte-de-dados/crypto';
 import { assinarEstado, verificarEstado } from './estado-oauth';
 import { GoogleConectorProvider } from './providers/google-conector.provider';
 import type { ConectorProvider } from './conector-provider.interface';
@@ -15,6 +17,8 @@ const DURACAO_STATE_MS = 10 * 60 * 1000;
 @Injectable()
 export class ConectorService {
   private readonly providers: Map<string, ConectorProvider>;
+  private readonly statesUsados = new Map<string, number>();
+  private readonly logger = new Logger(ConectorService.name);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -29,7 +33,13 @@ export class ConectorService {
   iniciar(provider: string, usuarioId: string, empresaId: string): string {
     const instancia = this.obterProvider(provider);
     const state = assinarEstado(
-      { usuarioId, empresaId, provider, exp: Date.now() + DURACAO_STATE_MS },
+      {
+        usuarioId,
+        empresaId,
+        provider,
+        jti: randomBytes(16).toString('hex'),
+        exp: Date.now() + DURACAO_STATE_MS,
+      },
       this.chaveState(),
     );
     return instancia.montarUrlAutorizacao(state);
@@ -53,6 +63,12 @@ export class ConectorService {
         'state não corresponde ao provider da rota',
       );
     }
+
+    this.purgarStatesExpirados();
+    if (this.statesUsados.has(payload.jti)) {
+      throw new UnauthorizedException('state já utilizado');
+    }
+    this.statesUsados.set(payload.jti, payload.exp);
 
     const instancia = this.obterProvider(provider);
     const dados = await instancia.trocarCodigoPorToken(code);
@@ -111,6 +127,26 @@ export class ConectorService {
     usuarioId: string,
     empresaId: string,
   ): Promise<void> {
+    const conexao = await this.prisma.conectorConexao.findUnique({
+      where: {
+        usuarioId_empresaId_provider: { usuarioId, empresaId, provider },
+      },
+    });
+    if (conexao) {
+      try {
+        const instancia = this.obterProvider(provider);
+        const chave = this.config.getOrThrow<string>('ERP_ENCRYPTION_KEY');
+        const tokenParaRevogar = conexao.refreshTokenCriptografado
+          ? descriptografar(conexao.refreshTokenCriptografado, chave)
+          : descriptografar(conexao.accessTokenCriptografado, chave);
+        await instancia.revogarToken(tokenParaRevogar);
+      } catch (erro) {
+        this.logger.warn(
+          `Falha ao revogar token no provider "${provider}" (best-effort): ${erro instanceof Error ? erro.message : String(erro)}`,
+        );
+      }
+    }
+
     await this.prisma.conectorConexao.deleteMany({
       where: { usuarioId, empresaId, provider },
     });
@@ -126,5 +162,12 @@ export class ConectorService {
 
   private chaveState(): string {
     return this.config.getOrThrow<string>('CONECTOR_STATE_SECRET');
+  }
+
+  private purgarStatesExpirados(): void {
+    const agora = Date.now();
+    for (const [jti, exp] of this.statesUsados) {
+      if (exp < agora) this.statesUsados.delete(jti);
+    }
   }
 }

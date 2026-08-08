@@ -4,6 +4,7 @@ export interface EstadoOAuth {
   usuarioId: string;
   empresaId: string;
   provider: string;
+  jti: string;
   exp: number;
 }
 
