@@ -36,8 +36,12 @@ export function Conectores({ actions, accessToken }: ConectoresProps) {
   const carregar = () => {
     setCarregando(true);
     apiFetch('/conectores', accessToken)
-      .then((r) => r.json() as Promise<ConectorConexao[]>)
+      .then((r) => {
+        if (!r.ok) throw new Error(`Falha ao carregar conectores (status ${r.status})`);
+        return r.json() as Promise<ConectorConexao[]>;
+      })
       .then(setConexoes)
+      .catch(() => actions.showToast('Não foi possível carregar os conectores.'))
       .finally(() => setCarregando(false));
   };
 
@@ -58,7 +62,8 @@ export function Conectores({ actions, accessToken }: ConectoresProps) {
 
   const desconectar = (provider: string) => {
     apiFetch(`/conectores/${provider}`, accessToken, { method: 'DELETE' })
-      .then(() => {
+      .then((r) => {
+        if (!r.ok) throw new Error(`Falha ao desconectar (status ${r.status})`);
         actions.showToast('Conector desconectado.');
         carregar();
       })
