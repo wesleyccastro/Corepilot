@@ -5,7 +5,8 @@ describe('GoogleConectorProvider', () => {
   const VALORES: Record<string, string> = {
     GOOGLE_OAUTH_CLIENT_ID: 'client-id-teste',
     GOOGLE_OAUTH_CLIENT_SECRET: 'client-secret-teste',
-    GOOGLE_OAUTH_REDIRECT_URI: 'http://localhost:3000/conectores/google/callback',
+    GOOGLE_OAUTH_REDIRECT_URI:
+      'http://localhost:3000/conectores/google/callback',
   };
 
   function buildConfig(): ConfigService {
@@ -51,7 +52,8 @@ describe('GoogleConectorProvider', () => {
             access_token: 'access-123',
             refresh_token: 'refresh-123',
             expires_in: 3600,
-            scope: 'openid email https://www.googleapis.com/auth/drive.readonly',
+            scope:
+              'openid email https://www.googleapis.com/auth/drive.readonly',
           }),
       } as Response)
       .mockResolvedValueOnce({
@@ -60,7 +62,9 @@ describe('GoogleConectorProvider', () => {
       } as Response);
     const provider = new GoogleConectorProvider(buildConfig());
 
-    const resultado = await provider.trocarCodigoPorToken('codigo-de-autorizacao');
+    const resultado = await provider.trocarCodigoPorToken(
+      'codigo-de-autorizacao',
+    );
 
     expect(resultado.accessToken).toBe('access-123');
     expect(resultado.refreshToken).toBe('refresh-123');

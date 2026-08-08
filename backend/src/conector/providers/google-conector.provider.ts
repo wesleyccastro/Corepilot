@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { ConectorProvider, DadosToken } from '../conector-provider.interface';
+import type {
+  ConectorProvider,
+  DadosToken,
+} from '../conector-provider.interface';
 
 const ESCOPOS_GOOGLE = [
   'openid',
